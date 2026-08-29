@@ -9,7 +9,7 @@ export * from './core/index.js';
 // Common helpers
 export * from './common/index.js';
 
-// Registries subsystem (Base Universal Registry + LLMs Static Registry)
+// Registries subsystem (Base Universal Registry + LLMs Registry + Prompts Registry)
 export * from './registries/index.js';
 
 // LLMs Execution Engine subsystem
