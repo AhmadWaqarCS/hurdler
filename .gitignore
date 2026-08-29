@@ -3,3 +3,9 @@
 .env*
 
 /.agents
+
+/dist
+
+/test
+
+/logs
