@@ -32,3 +32,6 @@ export * from './playwright/index.js';
 
 // CLI & Command Dispatcher Subsystem
 export * from './cli/index.js';
+
+// TUI Subsystem (Ink Terminal User Interface)
+export * from './tui/index.js';

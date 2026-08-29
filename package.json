@@ -32,6 +32,7 @@
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
+    "@types/react": "^19.2.18",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
     "typescript": "^5.9.3"
@@ -46,8 +47,13 @@
     "ai": "^7.0.84",
     "dotenv": "^17.4.2",
     "eslint": "^10.9.1",
+    "ink": "^7.1.1",
+    "ink-select-input": "^6.2.0",
+    "ink-spinner": "^5.0.0",
+    "ink-text-input": "^6.0.0",
     "playwright": "^1.62.1",
     "prettier": "^3.9.6",
+    "react": "^19.2.8",
     "simple-git": "^3.36.0",
     "tree-sitter": "^0.25.1",
     "tree-sitter-javascript": "^0.25.0",

@@ -124,6 +124,20 @@ export class DevModeManager {
   }
 
   /**
+   * Subscribes a listener to receive real-time log entries.
+   */
+  subscribe(listener: (entry: import('./types.js').LogEntry) => void): () => void {
+    return this.logger.subscribe(listener);
+  }
+
+  /**
+   * Returns recent log entries from in-memory ring buffer.
+   */
+  getRecentLogs(limit?: number): import('./types.js').LogEntry[] {
+    return this.logger.getRecentLogs(limit);
+  }
+
+  /**
    * Flushes all buffered log writes to disk.
    */
   async flush(): Promise<void> {
@@ -152,6 +166,16 @@ export function isDevMode(): boolean {
 /** Get the active DevLogger */
 export function getDevLogger(): DevLogger {
   return defaultDevMode.getLogger();
+}
+
+/** Subscribe to real-time dev logs */
+export function subscribeDevLogs(listener: (entry: import('./types.js').LogEntry) => void): () => void {
+  return defaultDevMode.subscribe(listener);
+}
+
+/** Get recent in-memory dev logs */
+export function getRecentDevLogs(limit?: number): import('./types.js').LogEntry[] {
+  return defaultDevMode.getRecentLogs(limit);
 }
 
 /** Flush buffered log lines to disk */

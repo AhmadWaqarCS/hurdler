@@ -27,9 +27,31 @@ export class DevLogger {
   private config: DevModeConfig;
   private fileWriter: DevLogFileWriter;
 
+  private listeners: Set<(entry: LogEntry) => void> = new Set();
+  private recentLogs: LogEntry[] = [];
+  private readonly MAX_RECENT_LOGS = 500;
+
   constructor(config: DevModeConfig) {
     this.config = config;
     this.fileWriter = new DevLogFileWriter(config);
+  }
+
+  /**
+   * Subscribes a listener callback to receive log entries in real time.
+   * Returns an unsubscribe function.
+   */
+  subscribe(listener: (entry: LogEntry) => void): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /**
+   * Returns recent in-memory log entries.
+   */
+  getRecentLogs(limit: number = 100): LogEntry[] {
+    return this.recentLogs.slice(-limit);
   }
 
   /**
@@ -83,6 +105,21 @@ export class DevLogger {
       error: serializedError,
       durationMs,
     };
+
+    // Store in recent buffer
+    this.recentLogs.push(entry);
+    if (this.recentLogs.length > this.MAX_RECENT_LOGS) {
+      this.recentLogs.shift();
+    }
+
+    // Notify listeners
+    for (const listener of this.listeners) {
+      try {
+        listener(entry);
+      } catch {
+        // Safe swallow
+      }
+    }
 
     // 1. Output to console if enabled
     if (this.config.consoleLogging) {

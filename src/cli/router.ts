@@ -68,6 +68,20 @@ export async function runCli(argv: string[] = process.argv.slice(2)): Promise<Cl
   }
 
   if (parsed.positionals.length === 0) {
+    // If running in an interactive terminal without flags/subcommands, launch the TUI
+    if (!isJson && !isQuiet && process.stdin.isTTY && !parsed.globalOptions.help) {
+      const { startTui } = await import('../tui/index.js');
+      await startTui({
+        dev: Boolean(parsed.globalOptions.dev),
+        projectRoot: parsed.globalOptions.cwd ? path.resolve(parsed.globalOptions.cwd) : process.cwd(),
+      });
+      return {
+        success: true,
+        exitCode: ExitCode.SUCCESS,
+        data: { message: 'TUI exited cleanly' },
+      };
+    }
+
     const helpText = renderRootHelp(COMMAND_REGISTRY);
     if (isJson) {
       printJson({ error: 'No command specified', help: helpText });

@@ -20,11 +20,13 @@ import { gitCommandDefinition } from './git.js';
 import { codeCommandDefinition } from './code.js';
 import { mapperCommandDefinition } from './mapper.js';
 import { uiCommandDefinition } from './ui.js';
+import { tuiCommandDefinition } from './tui.js';
 
 /**
  * Universal Command Registry mapping top-level names to command definitions.
  */
 export const COMMAND_REGISTRY: Record<string, CliCommandDefinition> = {
+  tui: tuiCommandDefinition,
   init: initCommandDefinition,
   config: configCommandDefinition,
   dev: devCommandDefinition,
@@ -57,3 +59,4 @@ export * from './git.js';
 export * from './code.js';
 export * from './mapper.js';
 export * from './ui.js';
+export * from './tui.js';
