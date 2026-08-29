@@ -21,3 +21,7 @@ export * from './git/index.js';
 // Code Subsystem (ESLint, Prettier, ts-morph, tree-sitter)
 export * from './code/index.js';
 
+// Workflows & Multi-Agent Orchestration Subsystem
+export * from './workflows/index.js';
+
+
