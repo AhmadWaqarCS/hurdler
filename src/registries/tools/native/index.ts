@@ -18,6 +18,13 @@ import {
   gitStageAndCommitTool,
   gitShowFileTool,
 } from './git.js';
+import {
+  mapCodebaseTool,
+  queryCodebaseMapTool,
+  getSymbolMapTool,
+  getFileMapTool,
+  getRefactoringContextTool,
+} from './mapper.js';
 import type { NativeToolDefinition } from '../types.js';
 
 export * from './fs-read.js';
@@ -25,6 +32,7 @@ export * from './fs-write.js';
 export * from './fs-edit.js';
 export * from './fs-dir.js';
 export * from './git.js';
+export * from './mapper.js';
 
 /**
  * Standard registry dictionary of all built-in native software engineering tools.
@@ -61,5 +69,13 @@ export const STATIC_TOOLS: Record<string, NativeToolDefinition> = {
   [gitBranchCheckoutTool.name]: gitBranchCheckoutTool,
   [gitStageAndCommitTool.name]: gitStageAndCommitTool,
   [gitShowFileTool.name]: gitShowFileTool,
+
+  // Mapper operations
+  [mapCodebaseTool.name]: mapCodebaseTool,
+  [queryCodebaseMapTool.name]: queryCodebaseMapTool,
+  [getSymbolMapTool.name]: getSymbolMapTool,
+  [getFileMapTool.name]: getFileMapTool,
+  [getRefactoringContextTool.name]: getRefactoringContextTool,
 };
+
 

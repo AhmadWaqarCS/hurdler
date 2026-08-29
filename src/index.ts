@@ -24,4 +24,7 @@ export * from './code/index.js';
 // Workflows & Multi-Agent Orchestration Subsystem
 export * from './workflows/index.js';
 
+// Mapper & Dynamic Registry Subsystem
+export * from './mapper/index.js';
+
 

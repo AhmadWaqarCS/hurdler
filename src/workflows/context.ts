@@ -10,7 +10,9 @@ import type {
 } from './types.js';
 import type { TokenUsage, CostBreakdown } from '../llms/billing/types.js';
 import { codeService } from '../code/service.js';
+import { defaultMapperService } from '../mapper/service.js';
 import { devDebug } from '../core/dev-mode/index.js';
+
 
 /**
  * Initializes a clean Workflow Execution Context.
@@ -126,6 +128,23 @@ export function recordFileChange(
     }
   }
 
+  // Synchronize with MapperService dynamic registry
+  try {
+    if (action === 'deleted') {
+      defaultMapperService.removeFile(normalizedPath, {
+        projectRoot: context.projectRoot,
+        writeToDisk: !context.dryRun,
+      });
+    } else if (content) {
+      defaultMapperService.updateFile(normalizedPath, content, {
+        projectRoot: context.projectRoot,
+        writeToDisk: !context.dryRun,
+      });
+    }
+  } catch {
+    // Non-fatal mapper sync
+  }
+
   const record: FileContextRecord = {
     filePath: normalizedPath,
     action,
@@ -145,6 +164,7 @@ export function recordFileChange(
 
   return record;
 }
+
 
 /**
  * Formats the active dynamic codebase context and exported symbols
