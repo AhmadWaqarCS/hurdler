@@ -122,3 +122,12 @@ export const ModulePromptOptionsSchema = z.object({
   versionStrategy: VersionStrategySchema.default('exact'),
   detailLevel: z.enum(['compact', 'detailed', 'full']).default('detailed'),
 });
+
+export const ModuleRegistryMapSchema = z.record(z.string(), ModuleDefinitionSchema);
+export const ModuleBundleRegistryMapSchema = z.record(z.string(), ModuleBundleSchema);
+
+export const PersistedModuleRegistrySchema = z.object({
+  modules: ModuleRegistryMapSchema.default({}),
+  bundles: ModuleBundleRegistryMapSchema.default({}),
+});
+

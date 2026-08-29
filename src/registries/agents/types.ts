@@ -7,6 +7,9 @@ import type {
   AgentDefinitionSchema,
   AgentQueryFilterSchema,
   AgentPromptCompositionOptionsSchema,
+  AgentUpdateSchema,
+  AgentRegistryMapSchema,
+  AgentStorageOptionsSchema,
 } from './schema.js';
 
 export type AgentCategory = z.infer<typeof AgentCategorySchema>;
@@ -15,6 +18,9 @@ export type AgentDefinition = z.infer<typeof AgentDefinitionSchema>;
 export type AgentInput = z.input<typeof AgentDefinitionSchema>;
 export type AgentQueryFilter = z.input<typeof AgentQueryFilterSchema>;
 export type AgentPromptCompositionOptions = z.input<typeof AgentPromptCompositionOptionsSchema>;
+export type AgentUpdateInput = z.input<typeof AgentUpdateSchema>;
+export type AgentRegistryMap = z.infer<typeof AgentRegistryMapSchema>;
+export type AgentStorageOptions = z.input<typeof AgentStorageOptionsSchema>;
 
 /**
  * Known capability tokens for specialized agent filtering and dispatching.

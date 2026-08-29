@@ -114,3 +114,51 @@ export const AgentPromptCompositionOptionsSchema = z.object({
   /** Section separator string (default: '\n\n---\n\n') */
   separator: z.string().default('\n\n---\n\n'),
 });
+
+export const AgentUpdateSchema = z.object({
+  /** Human-readable title or persona name */
+  title: z.string().min(1, 'Agent title must not be empty').optional(),
+  /** Functional category or domain classification */
+  category: AgentCategorySchema.optional(),
+  /** Concise summary of the agent's role and specialization */
+  description: z.string().min(1, 'Agent description must not be empty').optional(),
+  /** Explicit persona definition and operational role */
+  role: z.string().min(1, 'Agent role must not be empty').optional(),
+  /** Identity awareness prompt defining who and what the agent is, its mindset, and boundaries */
+  identityPrompt: z.string().min(1, 'Agent identity prompt must not be empty').optional(),
+  /** Git author configuration for source control commits, PRs, and reviews */
+  gitAuthor: GitAuthorSchema.optional(),
+  /** Array of prompt IDs from PromptRegistryService automatically composed for this agent */
+  defaultPrompts: z.array(z.string()).optional(),
+  /** Optional specific system-level instructions */
+  systemPrompt: z.string().optional(),
+  /** Allowed tool names or '*' for unrestricted access */
+  allowedTools: z.array(z.string()).optional(),
+  /** Explicitly disallowed tool names */
+  disallowedTools: z.array(z.string()).optional(),
+  /** Capability tokens for workflow dispatch and filtering */
+  capabilities: z.array(z.string()).optional(),
+  /** Preferred LLM model configurations */
+  preferredModel: AgentModelPreferenceSchema.optional(),
+  /** Searchable tags or labels */
+  tags: z.array(z.string()).optional(),
+  /** Whether this agent is currently active and selectable */
+  active: z.boolean().optional(),
+  /** Semantic version string or revision number */
+  version: z.union([z.string(), z.number()]).optional(),
+  /** Arbitrary metadata */
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const AgentRegistryMapSchema = z.record(z.string(), AgentDefinitionSchema);
+
+export const AgentStorageOptionsSchema = z.object({
+  /** Whether to write changes to disk (default: true) */
+  persist: z.boolean().default(true),
+  /** Custom target file path for agents JSON (relative or absolute) */
+  targetPath: z.string().optional(),
+  /** Project base directory (defaults to process.cwd()) */
+  projectRoot: z.string().optional(),
+  /** Force operation even if targeting a built-in agent (default: false) */
+  force: z.boolean().default(false),
+});

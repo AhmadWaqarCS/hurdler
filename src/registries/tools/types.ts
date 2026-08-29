@@ -53,6 +53,8 @@ export interface NativeToolDefinition<TInput = any, TOutput = any> {
   parameters: z.ZodType<TInput>;
   /** Async execution handler for the tool */
   execute: (input: TInput, context?: ToolExecutionContext) => Promise<TOutput>;
+  /** Whether the tool is enabled */
+  enabled?: boolean;
   /** Whether the tool is read-only (does not modify filesystem or external state) */
   readOnly?: boolean;
   /** Whether the tool performs potentially destructive operations */
@@ -66,6 +68,61 @@ export interface NativeToolDefinition<TInput = any, TOutput = any> {
 }
 
 /**
+ * Partial updates for an existing tool definition.
+ */
+export interface ToolUpdate<TInput = any, TOutput = any> {
+  /** Updated human and LLM-readable description */
+  description?: string;
+  /** Updated functional category */
+  category?: ToolCategory;
+  /** Updated input parameters validation schema */
+  parameters?: z.ZodType<TInput>;
+  /** Updated execution handler */
+  execute?: (input: TInput, context?: ToolExecutionContext) => Promise<TOutput>;
+  /** Updated enabled flag */
+  enabled?: boolean;
+  /** Updated read-only flag */
+  readOnly?: boolean;
+  /** Updated danger flag */
+  isDangerous?: boolean;
+  /** Updated search tags */
+  tags?: string[];
+  /** Updated version */
+  version?: string | number;
+  /** Updated arbitrary metadata (merged with existing) */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Serialized tool entry saved to `.hurdler/registries/tools.json`.
+ */
+export interface SerializedToolMetadata {
+  /** Tool name */
+  name: string;
+  /** Clear description of the tool */
+  description: string;
+  /** Functional category */
+  category: ToolCategory;
+  /** Whether the tool is enabled */
+  enabled?: boolean;
+  /** Whether the tool is read-only */
+  readOnly?: boolean;
+  /** Whether the tool performs destructive operations */
+  isDangerous?: boolean;
+  /** Searchable tags */
+  tags?: string[];
+  /** Version string or number */
+  version?: string | number;
+  /** Custom metadata or parameters schema annotations */
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Dictionary map of persisted tools in `.hurdler/registries/tools.json`.
+ */
+export type ToolRegistryMap = Record<string, SerializedToolMetadata>;
+
+/**
  * Structured result returned from executing a tool runner.
  */
 export interface ToolExecutionResult<TOutput = any> {
@@ -75,3 +132,4 @@ export interface ToolExecutionResult<TOutput = any> {
   error?: string;
   durationMs: number;
 }
+

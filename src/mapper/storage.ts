@@ -167,6 +167,42 @@ export async function loadCodebaseMap(
 }
 
 /**
+ * Loads a categorized map slice from disk (e.g. .hurdler/maps/categories/business-logic.json).
+ *
+ * @param category FileCategory name
+ * @param targetDir Optional custom maps directory
+ * @param projectRoot Project root directory
+ * @returns Parsed category map slice or null if file does not exist
+ */
+export async function loadCategoryMapSlice(
+  category: FileCategory,
+  targetDir?: string,
+  projectRoot = process.cwd()
+): Promise<{
+  category: FileCategory;
+  projectRoot: string;
+  updatedAt: string;
+  count: number;
+  files: Record<string, any>;
+} | null> {
+  const baseDir = targetDir
+    ? path.resolve(targetDir)
+    : path.resolve(projectRoot, DEFAULT_MAPS_DIR);
+
+  const catPath = path.join(baseDir, 'categories', `${category}.json`);
+
+  try {
+    const raw = await fs.readFile(catPath, 'utf8');
+    return JSON.parse(raw);
+  } catch (err: any) {
+    if (err.code === 'ENOENT') {
+      return null;
+    }
+    throw new MapPersistenceError(catPath, 'load', err.message, { cause: err });
+  }
+}
+
+/**
  * Checks if a persisted map file exists on disk.
  */
 export async function isMapFilePresent(
@@ -185,3 +221,4 @@ export async function isMapFilePresent(
     return false;
   }
 }
+

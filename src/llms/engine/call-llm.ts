@@ -1,4 +1,5 @@
 import { generateText, Output, type ModelMessage } from 'ai';
+import type { z } from 'zod';
 import { devDebug, devError, devInfo, devWarn } from '../../core/dev-mode/dev-mode.js';
 import { defaultLLMRegistry } from '../../registries/llms/service.js';
 import { calculateCost, normalizeUsage } from '../billing/calculator.js';
@@ -36,6 +37,16 @@ function buildMessages(options: CallLLMOptions): { system?: string; messages: Mo
 /**
  * Executes a direct (non-streaming) LLM request with automatic multi-key failover,
  * token usage tracking, and exact cost billing calculations.
+ *
+ * @example
+ * ```ts
+ * const res = await callLLM({
+ *   provider: 'google',
+ *   model: 'gemini-3.7-flash',
+ *   prompt: 'Hello world'
+ * });
+ * console.log(res.text, res.cost.totalCost);
+ * ```
  */
 export async function callLLM<T = unknown>(options: CallLLMOptions<T>): Promise<LLMResponse<T>> {
   if (!options.provider) {
@@ -275,3 +286,57 @@ export async function callLLM<T = unknown>(options: CallLLMOptions<T>): Promise<
   throw new LLMExecutionError(provider.id, model.id, errorMessage, lastError);
 }
 
+/**
+ * Convenience function for simple text generation with minimal boilerplate.
+ *
+ * @example
+ * ```ts
+ * const res = await callLLMText('Explain dependency injection in 2 sentences.');
+ * console.log(res.text);
+ * ```
+ */
+export async function callLLMText(
+  prompt: string,
+  options?: Partial<Omit<CallLLMOptions, 'prompt' | 'messages' | 'schema'>> & {
+    provider?: string;
+    model?: string;
+  }
+): Promise<LLMResponse<string>> {
+  const provider = options?.provider ?? 'google';
+  const model = options?.model ?? 'gemini-3.7-flash';
+  return callLLM<string>({
+    ...options,
+    provider,
+    model,
+    prompt,
+  });
+}
+
+/**
+ * Convenience function for structured object generation validated against a Zod schema.
+ *
+ * @example
+ * ```ts
+ * const schema = z.object({ summary: z.string(), score: z.number() });
+ * const res = await callLLMStructured('Analyze code quality', schema);
+ * console.log(res.object.summary, res.object.score);
+ * ```
+ */
+export async function callLLMStructured<T>(
+  prompt: string,
+  schema: z.ZodType<T>,
+  options?: Partial<Omit<CallLLMOptions<T>, 'prompt' | 'messages' | 'schema'>> & {
+    provider?: string;
+    model?: string;
+  }
+): Promise<LLMResponse<T>> {
+  const provider = options?.provider ?? 'google';
+  const model = options?.model ?? 'gemini-3.7-flash';
+  return callLLM<T>({
+    ...options,
+    provider,
+    model,
+    prompt,
+    schema,
+  });
+}

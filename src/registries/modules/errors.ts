@@ -56,3 +56,14 @@ export class VersionMismatchError extends HurdlerError {
     );
   }
 }
+
+export class ModuleStorageError extends HurdlerError {
+  constructor(filePath: string, operation: 'read' | 'write' | 'validate', message: string, cause?: unknown) {
+    super(`Failed to ${operation} modules registry at '${filePath}': ${message}`, {
+      code: 'MODULE_STORAGE_ERROR',
+      details: { filePath, operation },
+      cause,
+    });
+  }
+}
+

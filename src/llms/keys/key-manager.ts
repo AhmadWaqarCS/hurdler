@@ -11,14 +11,17 @@ import type {
 } from './types.js';
 
 export class AllKeysExhaustedError extends HurdlerError {
-  constructor(providerId: string, keysStatus: Array<{ maskedKey: string; status: KeyStatus; lastFailureReason?: string }>) {
+  constructor(
+    providerId: string,
+    keysStatus: Array<{ maskedKey: string; status: KeyStatus; lastFailureReason?: string }>
+  ) {
     const reasons = keysStatus
       .filter((k) => k.lastFailureReason)
       .map((k) => `[Key ${k.maskedKey} (${k.status}): ${k.lastFailureReason}]`)
       .join(', ');
-    const reasonSuffix = reasons ? ` Details: ${reasons}` : '';
+    const reasonSuffix = reasons ? ` Reasons: ${reasons}` : '';
     super(
-      `All API keys for provider '${providerId}' are currently exhausted, rate-limited, or invalid.${reasonSuffix}`,
+      `All API keys for provider '${providerId}' are currently exhausted, rate-limited, or invalid.${reasonSuffix}. Action: Please check quota, wait for cooldown to expire, or supply additional keys.`,
       {
         code: 'ALL_KEYS_EXHAUSTED',
         details: { providerId, keysStatus },
@@ -28,12 +31,16 @@ export class AllKeysExhaustedError extends HurdlerError {
 }
 
 export class NoKeysConfiguredError extends HurdlerError {
-  constructor(providerId: string) {
+  constructor(providerId: string, expectedEnvVars: string[] = []) {
+    const varHint =
+      expectedEnvVars.length > 0
+        ? ` (checked: ${expectedEnvVars.join(', ')})`
+        : ` (e.g. ${providerId.toUpperCase()}_API_KEY or ${providerId.toUpperCase()}_API_KEYS)`;
     super(
-      `No API keys configured for provider '${providerId}'. Please set the corresponding API key in your .env file (e.g. ${providerId.toUpperCase()}_API_KEY or ${providerId.toUpperCase()}_API_KEYS).`,
+      `No API keys configured for provider '${providerId}'. Please set the corresponding API key in your .env file${varHint} or supply explicit keys via configureProviderKeys('${providerId}', [...]).`,
       {
         code: 'NO_KEYS_CONFIGURED',
-        details: { providerId },
+        details: { providerId, expectedEnvVars },
       }
     );
   }
@@ -45,12 +52,24 @@ export class NoKeysConfiguredError extends HurdlerError {
  */
 export class KeyManager {
   private readonly pools = new Map<string, ProviderKeyPool>();
-  private readonly rateLimitCooldownMs: number;
-  private readonly quotaExhaustionCooldownMs: number;
+  private rateLimitCooldownMs: number;
+  private quotaExhaustionCooldownMs: number;
 
   constructor(options: KeyManagerOptions = {}) {
     this.rateLimitCooldownMs = options.rateLimitCooldownMs ?? 60_000; // 1 minute
     this.quotaExhaustionCooldownMs = options.quotaExhaustionCooldownMs ?? 3_600_000; // 1 hour
+  }
+
+  /**
+   * Reconfigures cooldown durations at runtime.
+   */
+  configure(options: KeyManagerOptions): void {
+    if (options.rateLimitCooldownMs !== undefined) {
+      this.rateLimitCooldownMs = options.rateLimitCooldownMs;
+    }
+    if (options.quotaExhaustionCooldownMs !== undefined) {
+      this.quotaExhaustionCooldownMs = options.quotaExhaustionCooldownMs;
+    }
   }
 
   /**
@@ -280,3 +299,65 @@ export class KeyManager {
 /** Default singleton instance of the KeyManager */
 export const defaultKeyManager = new KeyManager();
 
+// ============================================================================
+// STANDALONE FUNCTIONAL API (Function-First Paradigm)
+// ============================================================================
+
+/**
+ * Retrieves the currently active, un-exhausted API key for a provider.
+ *
+ * @param providerId - Provider identifier (e.g. 'google', 'anthropic').
+ * @returns ActiveKeyInfo containing key, index, maskedKey, and totalKeys.
+ */
+export function getActiveKey(providerId: string): ActiveKeyInfo {
+  return defaultKeyManager.getActiveKey(providerId);
+}
+
+/**
+ * Marks a key as successful, incrementing its usage count and clearing transient failure cooldowns.
+ */
+export function markKeySuccess(providerId: string, key: string): void {
+  defaultKeyManager.markKeySuccess(providerId, key);
+}
+
+/**
+ * Marks a key as failed, setting an appropriate cooldown and rotating to the next key.
+ */
+export function markKeyFailure(providerId: string, key: string, error: unknown): boolean {
+  return defaultKeyManager.markKeyFailure(providerId, key, error);
+}
+
+/**
+ * Returns health, usage statistics, and masked keys for a provider.
+ */
+export function getProviderKeysStatus(providerId: string): KeyState[] {
+  return defaultKeyManager.getKeysStatus(providerId);
+}
+
+/**
+ * Dynamically assigns explicit API keys to a provider pool at runtime.
+ */
+export function configureProviderKeys(providerId: string, keys: string[]): void {
+  defaultKeyManager.setExplicitKeys(providerId, keys);
+}
+
+/**
+ * Resets cooldowns and status for all keys in a provider pool.
+ */
+export function resetProviderKeys(providerId: string): void {
+  defaultKeyManager.resetProviderKeyStates(providerId);
+}
+
+/**
+ * Checks if any API keys are configured for a provider.
+ */
+export function hasProviderKeys(providerId: string): boolean {
+  return defaultKeyManager.hasKeys(providerId);
+}
+
+/**
+ * Configures global KeyManager behavior such as cooldown durations.
+ */
+export function configureKeyManager(options: KeyManagerOptions): void {
+  defaultKeyManager.configure(options);
+}

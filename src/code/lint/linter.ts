@@ -193,36 +193,42 @@ export async function lintFiles(
   options: LintFilesOptions = {}
 ): Promise<LintResult[]> {
   const parsedOptions = LintFilesOptionsSchema.parse(options);
-  const results: LintResult[] = [];
+  const concurrency = parsedOptions.concurrency ?? 4;
+  const results: LintResult[] = new Array(filePaths.length);
 
-  for (const filePath of filePaths) {
-    try {
-      const res = await lintFile(filePath, {
-        fix: parsedOptions.fix,
-        projectRoot: parsedOptions.projectRoot,
-        ruleOverrides: parsedOptions.ruleOverrides,
-      });
-      results.push(res);
-    } catch (err: any) {
-      results.push({
-        filePath,
-        isValid: false,
-        errorCount: 1,
-        warningCount: 0,
-        fixableErrorCount: 0,
-        fixableWarningCount: 0,
-        messages: [
-          {
-            ruleId: 'hurdler/lint-exception',
-            severity: 2,
-            severityText: 'error',
-            message: err.message,
-            line: 1,
-            column: 1,
-          },
-        ],
-      });
-    }
+  for (let i = 0; i < filePaths.length; i += concurrency) {
+    const chunk = filePaths.slice(i, i + concurrency);
+    const chunkPromises = chunk.map(async (filePath, idx) => {
+      const globalIdx = i + idx;
+      try {
+        const res = await lintFile(filePath, {
+          fix: parsedOptions.fix,
+          projectRoot: parsedOptions.projectRoot,
+          ruleOverrides: parsedOptions.ruleOverrides,
+        });
+        results[globalIdx] = res;
+      } catch (err: any) {
+        results[globalIdx] = {
+          filePath,
+          isValid: false,
+          errorCount: 1,
+          warningCount: 0,
+          fixableErrorCount: 0,
+          fixableWarningCount: 0,
+          messages: [
+            {
+              ruleId: 'hurdler/lint-exception',
+              severity: 2,
+              severityText: 'error',
+              message: err.message,
+              line: 1,
+              column: 1,
+            },
+          ],
+        };
+      }
+    });
+    await Promise.all(chunkPromises);
   }
 
   return results;
@@ -262,3 +268,24 @@ export async function fixLintFile(filePath: string, options: LintFileOptions = {
     warningCount: result.warningCount,
   };
 }
+
+/**
+ * Checks whether a code snippet or disk file contains any lint errors.
+ *
+ * @param codeOrPath - In-memory code string or file path on disk.
+ * @param options - Optional linting options.
+ * @returns Promise resolving to true if lint errors exist, false otherwise.
+ */
+export async function hasLintErrors(
+  codeOrPath: string,
+  options: LintTextOptions & LintFileOptions = {}
+): Promise<boolean> {
+  const isDiskFile = !codeOrPath.includes('\n') && codeOrPath.length < 500 && fileExists(codeOrPath);
+  if (isDiskFile) {
+    const res = await lintFile(codeOrPath, options);
+    return !res.isValid || res.errorCount > 0;
+  }
+  const res = await lintText(codeOrPath, options);
+  return !res.isValid || res.errorCount > 0;
+}
+

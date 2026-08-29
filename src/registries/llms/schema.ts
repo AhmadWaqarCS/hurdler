@@ -90,3 +90,17 @@ export const ProviderDefinitionSchema = z.object({
   envKeyNames: z.array(z.string()).default([]),
   models: z.record(z.string(), ModelDefinitionSchema),
 });
+
+export const ModelUpdateSchema = ModelDefinitionSchema.partial().omit({ id: true });
+export const ProviderUpdateSchema = ProviderDefinitionSchema.partial().omit({ id: true });
+export const LLMRegistryMapSchema = z.record(z.string(), ProviderDefinitionSchema);
+
+export const LLMEngineConfigSchema = z.object({
+  defaultProvider: z.string().optional(),
+  defaultModel: z.string().optional(),
+  defaultTier: ApiTierSchema.optional(),
+  rateLimitCooldownMs: z.number().positive().optional(),
+  quotaExhaustionCooldownMs: z.number().positive().optional(),
+  maxRetries: z.number().int().min(0).optional(),
+});
+

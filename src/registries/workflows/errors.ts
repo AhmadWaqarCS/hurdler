@@ -62,3 +62,25 @@ export class WorkflowAbortedError extends HurdlerError {
     });
   }
 }
+
+export class BuiltinWorkflowProtectionError extends HurdlerError {
+  constructor(workflowId: string) {
+    super(
+      `Cannot modify or remove built-in static workflow '${workflowId}'. Built-in workflows are protected. Pass force: true if intentional.`,
+      {
+        code: 'BUILTIN_WORKFLOW_PROTECTION',
+        details: { workflowId },
+      }
+    );
+  }
+}
+
+export class WorkflowStorageError extends HurdlerError {
+  constructor(filePath: string, operation: 'read' | 'write', message: string, cause?: unknown) {
+    super(`Workflow storage error during ${operation} on '${filePath}': ${message}`, {
+      code: 'WORKFLOW_STORAGE_ERROR',
+      details: { filePath, operation, message, cause },
+    });
+  }
+}
+

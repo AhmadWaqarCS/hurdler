@@ -1,5 +1,5 @@
 import { roundToDecimals } from '../../common/helpers.js';
-import { devDebug } from '../../core/dev-mode/dev-mode.js';
+import { devDebug, devInfo } from '../../core/dev-mode/dev-mode.js';
 import type { ApiTier } from '../../registries/llms/types.js';
 import type { CallBillingRecord, CostBreakdown, SessionSummary, TokenUsage } from './types.js';
 
@@ -117,8 +117,53 @@ export class SessionCostTracker {
   reset(): void {
     this.records = [];
     this.nextId = 1;
+    devInfo('BILLING', 'Reset session billing tracker records');
   }
 }
 
 /** Default singleton instance of the SessionCostTracker */
 export const defaultCostTracker = new SessionCostTracker();
+
+// ============================================================================
+// STANDALONE FUNCTIONAL API (Function-First Paradigm)
+// ============================================================================
+
+/**
+ * Records an invocation in the default session cost tracker.
+ */
+export function recordCallCost(params: {
+  providerId: string;
+  modelId: string;
+  tier: ApiTier;
+  usage: TokenUsage;
+  cost: CostBreakdown;
+}): CallBillingRecord {
+  return defaultCostTracker.recordCall(params);
+}
+
+/**
+ * Retrieves the aggregated billing and token summary for the current session.
+ *
+ * @example
+ * ```ts
+ * const summary = getSessionCostSummary();
+ * console.log(`Total Spent: $${summary.totalCost} across ${summary.totalCalls} calls.`);
+ * ```
+ */
+export function getSessionCostSummary(): SessionSummary {
+  return defaultCostTracker.getSessionSummary();
+}
+
+/**
+ * Retrieves all individual billing records recorded during this session.
+ */
+export function getSessionCallRecords(): ReadonlyArray<CallBillingRecord> {
+  return defaultCostTracker.getRecords();
+}
+
+/**
+ * Resets all accumulated session costs and call history.
+ */
+export function resetSessionCost(): void {
+  defaultCostTracker.reset();
+}

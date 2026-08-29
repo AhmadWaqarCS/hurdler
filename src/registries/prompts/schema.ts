@@ -63,3 +63,44 @@ export const PromptCompositionOptionsSchema = z.object({
   /** Whether to utilize in-memory composition caching for faster repeats */
   useCache: z.boolean().default(true),
 });
+
+/** Schema for updating an existing prompt definition */
+export const PromptUpdateSchema = z.object({
+  /** Human-readable title or name */
+  title: z.string().min(1, 'Prompt title must not be empty').optional(),
+  /** Functional category or classification */
+  category: PromptCategorySchema.optional(),
+  /** Raw prompt template content with optional {{variable}} placeholders */
+  content: z.string().min(1, 'Prompt content must not be empty').optional(),
+  /** Optional summary or description of the prompt's intent */
+  description: z.string().optional(),
+  /** Explicitly declared variable names required or accepted by this prompt template */
+  variables: z.array(z.string()).optional(),
+  /** Whether this prompt is static and eligible for LLM prompt caching */
+  cacheable: z.boolean().optional(),
+  /** Priority ordering when composing multiple prompts (lower number = higher priority) */
+  priority: z.number().int().optional(),
+  /** Searchable tags or labels for workflow filtering */
+  tags: z.array(z.string()).optional(),
+  /** Semantic version string or revision number */
+  version: z.union([z.string(), z.number()]).optional(),
+  /** Arbitrary metadata */
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+/** Schema for runtime configuration of the Prompts registry and engine */
+export const PromptRegistryConfigSchema = z.object({
+  /** Custom file path for disk storage (defaults to .hurdler/registries/prompts.json) */
+  storagePath: z.string().optional(),
+  /** Automatically synchronize in-memory registry changes to disk */
+  autoSync: z.boolean().default(true),
+  /** Default delimiter string used when concatenating prompts */
+  defaultSeparator: z.string().default('\n\n---\n\n'),
+  /** Default strict mode for template rendering */
+  strictVariables: z.boolean().default(false),
+  /** Whether prompt composition and template caching is enabled */
+  cacheEnabled: z.boolean().default(true),
+  /** Default cache TTL in milliseconds */
+  cacheTtlMs: z.number().int().positive().optional(),
+});
+

@@ -390,3 +390,38 @@ export interface CodeContextResult {
   inspection: FileSymbolInspection;
   astDiff?: ASTDiffSummary;
 }
+
+// ==========================================
+// Batch Pipeline & Project Configuration Types
+// ==========================================
+
+export interface BatchValidateAndPrettifyOptions {
+  fixLint?: boolean;
+  projectRoot?: string;
+  concurrency?: number;
+  ruleOverrides?: Record<string, unknown>;
+  prettierOptions?: PrettifyOptions;
+}
+
+export interface BatchValidateAndPrettifyResult {
+  totalFiles: number;
+  validFiles: string[];
+  invalidFiles: Array<{
+    filePath: string;
+    errorCount: number;
+    warningCount: number;
+    messages: LintMessage[];
+    llmDiagnosticSummary?: string;
+  }>;
+  formattedFiles: string[];
+  success: boolean;
+}
+
+export interface ProjectCodeConfig {
+  lintRuleOverrides?: Record<string, unknown>;
+  defaultPrettierOptions?: PrettifyOptions;
+  outlineDefaults?: OutlineOptions;
+  codebaseScanner?: CodebaseOutlineOptions;
+  concurrency?: number;
+}
+

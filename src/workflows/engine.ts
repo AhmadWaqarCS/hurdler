@@ -23,7 +23,7 @@ import type {
 /**
  * Topologically sorts workflow steps according to their declared dependencies.
  */
-function resolveStepExecutionOrder(steps: WorkflowStepDefinition[]): WorkflowStepDefinition[] {
+export function resolveStepExecutionOrder(steps: WorkflowStepDefinition[]): WorkflowStepDefinition[] {
   const stepMap = new Map<string, WorkflowStepDefinition>();
   for (const step of steps) {
     stepMap.set(step.id, step);
@@ -65,6 +65,80 @@ function resolveStepExecutionOrder(steps: WorkflowStepDefinition[]): WorkflowSte
 
   return ordered;
 }
+
+/**
+ * Validates that a workflow definition forms a valid Directed Acyclic Graph (DAG)
+ * without cyclic dependencies or missing prerequisite step IDs.
+ */
+export function validateWorkflowDAG(workflow: WorkflowDefinition): {
+  isValid: boolean;
+  orderedSteps?: WorkflowStepDefinition[];
+  error?: string;
+} {
+  try {
+    const ordered = resolveStepExecutionOrder(workflow.steps);
+    return { isValid: true, orderedSteps: ordered };
+  } catch (err: any) {
+    return { isValid: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
+ * Retrieves all direct and transitive prerequisite steps that must run before the specified step.
+ */
+export function getWorkflowPrerequisites(
+  workflow: WorkflowDefinition,
+  stepId: string
+): WorkflowStepDefinition[] {
+  const stepMap = new Map(workflow.steps.map((s) => [s.id, s]));
+  const targetStep = stepMap.get(stepId);
+  if (!targetStep) {
+    return [];
+  }
+
+  const prereqIds = new Set<string>();
+  function collect(currentId: string) {
+    const s = stepMap.get(currentId);
+    if (!s) return;
+    for (const dep of s.dependsOn ?? []) {
+      if (!prereqIds.has(dep)) {
+        prereqIds.add(dep);
+        collect(dep);
+      }
+    }
+  }
+
+  collect(stepId);
+  return Array.from(prereqIds)
+    .map((id) => stepMap.get(id))
+    .filter((s): s is WorkflowStepDefinition => s !== undefined);
+}
+
+/**
+ * Retrieves all steps that directly or transitively depend on the specified step.
+ */
+export function findDependentSteps(
+  workflow: WorkflowDefinition,
+  stepId: string
+): WorkflowStepDefinition[] {
+  const stepMap = new Map(workflow.steps.map((s) => [s.id, s]));
+  const dependentIds = new Set<string>();
+
+  function collectDownstream(currentId: string) {
+    for (const step of workflow.steps) {
+      if ((step.dependsOn ?? []).includes(currentId) && !dependentIds.has(step.id)) {
+        dependentIds.add(step.id);
+        collectDownstream(step.id);
+      }
+    }
+  }
+
+  collectDownstream(stepId);
+  return Array.from(dependentIds)
+    .map((id) => stepMap.get(id))
+    .filter((s): s is WorkflowStepDefinition => s !== undefined);
+}
+
 
 /**
  * Executes a complete multi-agent workflow pipeline end-to-end.

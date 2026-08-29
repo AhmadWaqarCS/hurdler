@@ -148,9 +148,38 @@ export const NativeToolDefinitionSchema = z.object({
   category: ToolCategorySchema.default('utility'),
   parameters: z.custom<z.ZodType<any>>((val) => typeof val === 'object' && val !== null, 'Parameters must be a Zod schema'),
   execute: z.custom<(...args: any[]) => Promise<any>>((val) => typeof val === 'function', 'Execute must be an async function'),
+  enabled: z.boolean().default(true),
   readOnly: z.boolean().default(false),
   isDangerous: z.boolean().default(false),
   tags: z.array(z.string()).default([]),
   version: z.union([z.string(), z.number()]).optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
+
+export const ToolUpdateSchema = z.object({
+  description: z.string().min(1).optional(),
+  category: ToolCategorySchema.optional(),
+  parameters: z.custom<z.ZodType<any>>((val) => typeof val === 'object' && val !== null, 'Parameters must be a Zod schema').optional(),
+  execute: z.custom<(...args: any[]) => Promise<any>>((val) => typeof val === 'function', 'Execute must be an async function').optional(),
+  enabled: z.boolean().optional(),
+  readOnly: z.boolean().optional(),
+  isDangerous: z.boolean().optional(),
+  tags: z.array(z.string()).optional(),
+  version: z.union([z.string(), z.number()]).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const ToolRegistryEntrySchema = z.object({
+  name: z.string().min(1, 'Tool name must not be empty'),
+  description: z.string().min(1, 'Tool description must not be empty'),
+  category: ToolCategorySchema.default('utility'),
+  enabled: z.boolean().default(true),
+  readOnly: z.boolean().default(false),
+  isDangerous: z.boolean().default(false),
+  tags: z.array(z.string()).default([]),
+  version: z.union([z.string(), z.number()]).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
+export const ToolRegistryMapSchema = z.record(z.string(), ToolRegistryEntrySchema);
+

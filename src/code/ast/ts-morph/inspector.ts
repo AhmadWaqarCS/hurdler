@@ -509,3 +509,52 @@ export function inspectSourceFile(filePath: string, projectRoot?: string): FileS
   devInfo('AST_INSPECT_FILE', `Inspected "${filePath}" with ${inspection.functions.length} functions, ${inspection.classes.length} classes, ${inspection.interfaces.length} interfaces`);
   return inspection;
 }
+
+/**
+ * Convenience helper to extract functions directly from a code string.
+ */
+export function extractFunctionsFromCode(code: string, filePath = 'snippet.ts'): FunctionInfo[] {
+  const sourceFile = createVirtualSourceFile(code, filePath);
+  return extractFunctions(sourceFile);
+}
+
+/**
+ * Convenience helper to extract classes directly from a code string.
+ */
+export function extractClassesFromCode(code: string, filePath = 'snippet.ts'): ClassInfo[] {
+  const sourceFile = createVirtualSourceFile(code, filePath);
+  return extractClasses(sourceFile);
+}
+
+/**
+ * Convenience helper to extract interfaces directly from a code string.
+ */
+export function extractInterfacesFromCode(code: string, filePath = 'snippet.ts'): InterfaceInfo[] {
+  const sourceFile = createVirtualSourceFile(code, filePath);
+  return extractInterfaces(sourceFile);
+}
+
+/**
+ * Convenience helper to extract React/Next.js components directly from a code string.
+ */
+export function extractComponentsFromCode(code: string, filePath = 'snippet.ts'): ComponentInfo[] {
+  const sourceFile = createVirtualSourceFile(code, filePath);
+  return extractComponents(sourceFile);
+}
+
+/**
+ * Convenience helper to extract exports directly from a code string.
+ */
+export function extractExportsFromCode(code: string, filePath = 'snippet.ts'): ExportInfo[] {
+  const sourceFile = createVirtualSourceFile(code, filePath);
+  return extractExports(sourceFile);
+}
+
+/**
+ * Convenience helper to extract imports directly from a code string.
+ */
+export function extractImportsFromCode(code: string, filePath = 'snippet.ts'): ImportInfo[] {
+  const sourceFile = createVirtualSourceFile(code, filePath);
+  return extractImports(sourceFile);
+}
+

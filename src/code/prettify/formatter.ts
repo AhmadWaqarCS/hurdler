@@ -119,36 +119,41 @@ export async function checkFilePrettified(filePath: string): Promise<boolean> {
 }
 
 /**
- * Prettifies multiple files in batch.
+ * Prettifies multiple files in batch with concurrency control.
  */
 export async function prettifyFiles(
   filePaths: string[],
   options: PrettifyFilesOptions = {}
 ): Promise<PrettifyFilesResult> {
   const parsed = PrettifyFilesOptionsSchema.parse(options);
+  const concurrency = parsed.concurrency ?? 4;
   const formattedFiles: string[] = [];
   const unchangedFiles: string[] = [];
   const failedFiles: Array<{ filePath: string; error: string }> = [];
 
-  for (const filePath of filePaths) {
-    try {
-      const res = await prettifyFile(filePath, {
-        overwrite: parsed.overwrite,
-        projectRoot: parsed.projectRoot,
-        options: parsed.options,
-      });
+  for (let i = 0; i < filePaths.length; i += concurrency) {
+    const chunk = filePaths.slice(i, i + concurrency);
+    const chunkPromises = chunk.map(async (filePath) => {
+      try {
+        const res = await prettifyFile(filePath, {
+          overwrite: parsed.overwrite,
+          projectRoot: parsed.projectRoot,
+          options: parsed.options,
+        });
 
-      if (res.formatted) {
-        formattedFiles.push(res.filePath);
-      } else {
-        unchangedFiles.push(res.filePath);
+        if (res.formatted) {
+          formattedFiles.push(res.filePath);
+        } else {
+          unchangedFiles.push(res.filePath);
+        }
+      } catch (err: any) {
+        failedFiles.push({
+          filePath,
+          error: err.message,
+        });
       }
-    } catch (err: any) {
-      failedFiles.push({
-        filePath,
-        error: err.message,
-      });
-    }
+    });
+    await Promise.all(chunkPromises);
   }
 
   return {
@@ -159,3 +164,4 @@ export async function prettifyFiles(
     success: failedFiles.length === 0,
   };
 }
+

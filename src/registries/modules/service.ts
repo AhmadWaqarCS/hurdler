@@ -21,6 +21,11 @@ import {
   formatInstallCommands,
   formatPackageJsonDependencies as formatPackageJsonDeps,
 } from './formatter.js';
+import {
+  saveModuleRegistryToDisk,
+  loadModuleRegistryFromDisk,
+  syncModuleRegistryWithDisk,
+} from './storage.js';
 import type {
   ModuleDefinition,
   ModuleBundle,
@@ -32,7 +37,11 @@ import type {
   PackageJsonDependenciesResult,
   ModuleCategory,
   RuntimeEnvironment,
+  ModuleRegistryMap,
+  ModuleBundleMap,
+  PersistedModuleRegistry,
 } from './types.js';
+
 
 /**
  * Service managing the modules registry, bundles, dependency resolution, and LLM context generation.
@@ -349,6 +358,92 @@ export class ModuleRegistryService {
     this.bundleRegistry.register(key, validated);
     devInfo('REGISTRY', `Registered module bundle '${validated.id}' with ${validated.modules.length} module(s)`);
   }
+
+  /**
+   * Unregisters a module definition.
+   */
+  unregisterModule(name: string): boolean {
+    const key = name.toLowerCase().trim();
+    const removed = this.moduleRegistry.unregister(key);
+    if (removed) {
+      devInfo('REGISTRY', `Unregistered module '${name}'`);
+    }
+    return removed;
+  }
+
+  /**
+   * Unregisters a preset module bundle.
+   */
+  unregisterBundle(id: string): boolean {
+    const key = id.toLowerCase().trim();
+    const removed = this.bundleRegistry.unregister(key);
+    if (removed) {
+      devInfo('REGISTRY', `Unregistered module bundle '${id}'`);
+    }
+    return removed;
+  }
+
+  /**
+   * Clears custom module registrations and resets to static baseline.
+   */
+  clearCustom(): void {
+    this.reset();
+  }
+
+  /**
+   * Resets modules and bundles registries to initial static baseline.
+   */
+  reset(): void {
+    this.moduleRegistry.clear();
+    for (const [key, mod] of Object.entries(STATIC_MODULES)) {
+      this.moduleRegistry.register(key.toLowerCase().trim(), mod);
+    }
+
+    this.bundleRegistry.clear();
+    for (const [key, bundle] of Object.entries(STATIC_MODULE_BUNDLES)) {
+      this.bundleRegistry.register(key.toLowerCase().trim(), bundle);
+    }
+
+    devInfo('REGISTRY', 'Reset modules and bundles registries to baseline static defaults');
+  }
+
+  /**
+   * Loads modules and bundles from `.hurdler/registries/modules.json` into memory.
+   */
+  async loadFromDisk(options?: { targetPath?: string; projectRoot?: string }): Promise<void> {
+    const persisted = await loadModuleRegistryFromDisk(options);
+    if (persisted) {
+      for (const mod of Object.values(persisted.modules)) {
+        this.registerModule(mod);
+      }
+      for (const bundle of Object.values(persisted.bundles)) {
+        this.registerBundle(bundle);
+      }
+    }
+  }
+
+  /**
+   * Saves current in-memory modules and bundles to `.hurdler/registries/modules.json`.
+   */
+  async saveToDisk(options?: { targetPath?: string; projectRoot?: string }): Promise<void> {
+    const modules = this.moduleRegistry.getAll();
+    const bundles = this.bundleRegistry.getAll();
+    await saveModuleRegistryToDisk(modules, bundles, options);
+  }
+
+  /**
+   * Synchronizes in-memory registry with `.hurdler/registries/modules.json`.
+   */
+  async syncWithDisk(options?: { targetPath?: string; projectRoot?: string }): Promise<PersistedModuleRegistry> {
+    const merged = await syncModuleRegistryWithDisk(options);
+    for (const mod of Object.values(merged.modules)) {
+      this.registerModule(mod);
+    }
+    for (const bundle of Object.values(merged.bundles)) {
+      this.registerBundle(bundle);
+    }
+    return merged;
+  }
 }
 
 /** Default singleton instance of the Module Registry Service */
@@ -434,3 +529,41 @@ export function registerManyModules(modules: ModuleDefinition[]): void {
 export function registerBundle(bundle: ModuleBundle): void {
   defaultModuleRegistry.registerBundle(bundle);
 }
+
+export function unregisterModule(name: string): boolean {
+  return defaultModuleRegistry.unregisterModule(name);
+}
+
+export function unregisterBundle(id: string): boolean {
+  return defaultModuleRegistry.unregisterBundle(id);
+}
+
+export function clearCustomModules(): void {
+  defaultModuleRegistry.clearCustom();
+}
+
+export function resetModulesToBaseline(): void {
+  defaultModuleRegistry.reset();
+}
+
+export async function loadModulesFromDisk(options?: {
+  targetPath?: string;
+  projectRoot?: string;
+}): Promise<void> {
+  await defaultModuleRegistry.loadFromDisk(options);
+}
+
+export async function saveModulesToDisk(options?: {
+  targetPath?: string;
+  projectRoot?: string;
+}): Promise<void> {
+  await defaultModuleRegistry.saveToDisk(options);
+}
+
+export async function syncModulesWithDisk(options?: {
+  targetPath?: string;
+  projectRoot?: string;
+}): Promise<PersistedModuleRegistry> {
+  return defaultModuleRegistry.syncWithDisk(options);
+}
+

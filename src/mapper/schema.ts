@@ -176,3 +176,17 @@ export const FileUpdateOptionsSchema = z.object({
   writeToDisk: z.boolean().default(true),
   triggerClassifier: z.boolean().default(true),
 });
+
+export const MapperConfigSchema = z.object({
+  projectRoot: z.string().default(process.cwd()),
+  mapDir: z.string().default('.hurdler/maps'),
+  autoSyncOnUpdate: z.boolean().default(true),
+  includeExtensions: z.array(z.string()).default(['.ts', '.tsx', '.js', '.jsx', '.json']),
+  excludePatterns: z
+    .array(z.string())
+    .default(['node_modules', '.git', 'dist', '.next', 'build', 'coverage', '.hurdler']),
+  maxFiles: z.number().int().positive().default(5000),
+  defaultLimit: z.number().int().positive().default(50),
+  prettyJson: z.boolean().default(true),
+});
+

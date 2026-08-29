@@ -174,3 +174,36 @@ export function compareSourceAst(
     explanationMarkdown: mdLines.join('\n'),
   };
 }
+
+/**
+ * Formats an ASTDiffSummary into a concise, high-signal Markdown block for LLM prompts.
+ *
+ * @param summary - ASTDiffSummary object from compareSourceAst.
+ * @returns Markdown string formatted for LLM understanding.
+ */
+export function formatAstDiffForLLM(summary: ASTDiffSummary): string {
+  if (!summary.hasChanges) {
+    return '✓ No AST symbol modifications detected.';
+  }
+
+  const sections: string[] = [];
+  sections.push(`### 🧬 AST Symbol Modifications in \`${summary.filePath ?? 'file'}\``);
+  sections.push('The following functions, classes, interfaces, or types were altered:');
+
+  for (const ch of summary.changes) {
+    const icon = ch.kind === 'added' ? '🟢 [NEW]' : ch.kind === 'modified' ? '🟡 [CHANGED]' : '🔴 [DELETED]';
+    sections.push(`\n${icon} **${ch.symbolType.toUpperCase()}** \`${ch.name}\``);
+    if (ch.oldSignature) {
+      sections.push(`  - *Before*: \`${ch.oldSignature}\``);
+    }
+    if (ch.newSignature) {
+      sections.push(`  - *After*: \`${ch.newSignature}\``);
+    }
+    if (ch.details) {
+      sections.push(`  - *Note*: ${ch.details}`);
+    }
+  }
+
+  return sections.join('\n');
+}
+

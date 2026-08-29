@@ -11,7 +11,14 @@ import type {
   CodebaseScanOptionsSchema,
   FileUpdateOptionsSchema,
   MapStatsSchema,
+  MapperConfigSchema,
 } from './schema.js';
+
+// ==========================================
+// Subsystem Configuration Types
+// ==========================================
+
+export type MapperConfig = z.infer<typeof MapperConfigSchema>;
 
 // ==========================================
 // Semantic Categorization Types

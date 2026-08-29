@@ -8,6 +8,9 @@ import type {
   WorkflowStepDefinitionSchema,
   WorkflowDefinitionSchema,
   WorkflowQueryFilterSchema,
+  WorkflowRegistryMapSchema,
+  WorkflowUpdateSchema,
+  WorkflowStorageOptionsSchema,
 } from './schema.js';
 
 export type WorkflowCategory = z.infer<typeof WorkflowCategorySchema>;
@@ -17,7 +20,20 @@ export type WorkflowStepLintAction = z.infer<typeof WorkflowStepLintActionSchema
 export type WorkflowStepPlaywrightAction = z.infer<typeof WorkflowStepPlaywrightActionSchema>;
 export type WorkflowStepDefinition = z.infer<typeof WorkflowStepDefinitionSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
-export type WorkflowQueryFilter = z.infer<typeof WorkflowQueryFilterSchema>;
+export interface WorkflowQueryFilter {
+  category?: string;
+  categories?: string[];
+  tag?: string;
+  tags?: string[];
+  agentId?: string;
+  search?: string;
+  isBuiltin?: boolean;
+  activeOnly?: boolean;
+  targetFramework?: string;
+}
+export type WorkflowRegistryMap = z.infer<typeof WorkflowRegistryMapSchema>;
+export type WorkflowUpdateInput = z.infer<typeof WorkflowUpdateSchema>;
+export type WorkflowStorageOptions = z.infer<typeof WorkflowStorageOptionsSchema>;
 
 export type WorkflowInput = Omit<
   WorkflowDefinition,
@@ -27,3 +43,4 @@ export type WorkflowInput = Omit<
   createdAt?: string;
   updatedAt?: string;
 };
+

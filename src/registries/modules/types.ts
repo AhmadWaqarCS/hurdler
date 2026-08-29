@@ -145,3 +145,12 @@ export interface ModulePromptOptions {
   /** Level of detail: 'compact' | 'detailed' | 'full' (default: 'detailed') */
   detailLevel?: 'compact' | 'detailed' | 'full';
 }
+
+export type ModuleRegistryMap = Record<string, ModuleDefinition>;
+export type ModuleBundleMap = Record<string, ModuleBundle>;
+
+export interface PersistedModuleRegistry {
+  modules: ModuleRegistryMap;
+  bundles: ModuleBundleMap;
+}
+

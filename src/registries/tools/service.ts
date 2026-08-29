@@ -1,10 +1,19 @@
 import { BaseRegistry } from '../base/registry.js';
-import { devInfo } from '../../core/dev-mode/dev-mode.js';
-import { NativeToolDefinitionSchema, ToolFilterOptionsSchema } from './schema.js';
+import { devDebug, devInfo, devWarn } from '../../core/dev-mode/dev-mode.js';
+import {
+  NativeToolDefinitionSchema,
+  ToolFilterOptionsSchema,
+  ToolUpdateSchema,
+} from './schema.js';
 import { ToolNotFoundError, ToolAlreadyExistsError } from './errors.js';
 import { STATIC_TOOLS } from './native/index.js';
 import { toAISDKToolMap, toAISDKTool } from './adapter.js';
 import { executeTool } from './runner.js';
+import {
+  saveToolRegistryToDisk,
+  loadToolRegistryFromDisk,
+  syncToolRegistryWithDisk,
+} from './storage.js';
 import type { Tool } from 'ai';
 import type {
   NativeToolDefinition,
@@ -12,11 +21,12 @@ import type {
   ToolExecutionContext,
   ToolExecutionResult,
   ToolFilterOptions,
+  ToolUpdate,
 } from './types.js';
 
 /**
  * Universal Tool Registry Service for registering, querying, sandboxing,
- * and converting native tools into AI SDK tools.
+ * updating, and converting native tools into AI SDK tools.
  */
 export class ToolRegistryService {
   private readonly registry: BaseRegistry<string, NativeToolDefinition>;
@@ -77,6 +87,47 @@ export class ToolRegistryService {
   }
 
   /**
+   * Updates an existing tool with partial attributes.
+   *
+   * @param name - Tool name.
+   * @param updates - Partial tool updates.
+   */
+  update(name: string, updates: ToolUpdate): NativeToolDefinition {
+    const existing = this.get(name);
+    const validatedUpdates = ToolUpdateSchema.parse(updates);
+
+    const updated: NativeToolDefinition = {
+      ...existing,
+      ...validatedUpdates,
+      name: existing.name,
+      tags: validatedUpdates.tags
+        ? Array.from(new Set([...(existing.tags || []), ...validatedUpdates.tags]))
+        : existing.tags,
+      metadata: validatedUpdates.metadata
+        ? { ...(existing.metadata || {}), ...validatedUpdates.metadata }
+        : existing.metadata,
+    };
+
+    this.registerOrUpdate(updated);
+    devInfo('TOOL_REGISTRY', `Updated tool '${name}'`);
+    return updated;
+  }
+
+  /**
+   * Unregisters a tool by name.
+   *
+   * @param name - Tool name to remove.
+   * @returns true if tool was removed.
+   */
+  unregister(name: string): boolean {
+    const removed = this.registry.unregister(name);
+    if (removed) {
+      devInfo('TOOL_REGISTRY', `Unregistered tool '${name}'`);
+    }
+    return removed;
+  }
+
+  /**
    * Registers multiple tools at once.
    */
   registerMany(tools: NativeToolDefinition[] | Record<string, NativeToolDefinition>): this {
@@ -93,7 +144,8 @@ export class ToolRegistryService {
   get(name: string): NativeToolDefinition {
     const tool = this.registry.getOrNull(name);
     if (!tool) {
-      throw new ToolNotFoundError(name);
+      const available = this.registry.getAll().map((t) => t.name);
+      throw new ToolNotFoundError(name, available);
     }
     return tool;
   }
@@ -202,6 +254,51 @@ export class ToolRegistryService {
   }
 
   /**
+   * Synchronizes this registry instance with `.hurdler/registries/tools.json` on disk.
+   */
+  async syncWithDisk(options?: { targetPath?: string; projectRoot?: string }): Promise<void> {
+    const diskMap = await syncToolRegistryWithDisk(options);
+    for (const [name, meta] of Object.entries(diskMap)) {
+      if (this.has(name)) {
+        this.update(name, meta);
+      }
+    }
+  }
+
+  /**
+   * Loads registry records from disk.
+   */
+  async loadFromDisk(options?: { targetPath?: string; projectRoot?: string }): Promise<void> {
+    const diskMap = await loadToolRegistryFromDisk(options);
+    if (diskMap) {
+      for (const [name, meta] of Object.entries(diskMap)) {
+        if (this.has(name)) {
+          this.update(name, meta);
+        }
+      }
+    }
+  }
+
+  /**
+   * Persists current in-memory registry to `.hurdler/registries/tools.json`.
+   */
+  async saveToDisk(options?: { targetPath?: string; projectRoot?: string }): Promise<void> {
+    const allTools = this.registry.getAll();
+    await saveToolRegistryToDisk(allTools, options);
+  }
+
+  /**
+   * Resets registry back to baseline static tools.
+   */
+  reset(): void {
+    this.registry.clear();
+    for (const tool of Object.values(STATIC_TOOLS)) {
+      this.registerInternal(tool);
+    }
+    devInfo('TOOL_REGISTRY', 'Reset tool registry to baseline static tools');
+  }
+
+  /**
    * Returns total count of registered tools.
    */
   count(): number {
@@ -228,3 +325,238 @@ export class ToolRegistryService {
  * Default global singleton instance of the Tool Registry Service.
  */
 export const defaultToolRegistry = new ToolRegistryService();
+
+// ============================================================================
+// STANDALONE FUNCTIONAL API (Function-First Paradigm)
+// ============================================================================
+
+/**
+ * Retrieves a tool definition by name from the default registry.
+ *
+ * @example
+ * ```ts
+ * const tool = getTool('create_file');
+ * console.log(tool.description);
+ * ```
+ * @param name - Tool name.
+ * @throws ToolNotFoundError if tool is not registered.
+ */
+export function getTool(name: string): NativeToolDefinition {
+  return defaultToolRegistry.get(name);
+}
+
+/**
+ * Checks whether a tool is registered in the default registry.
+ *
+ * @param name - Tool name.
+ */
+export function hasTool(name: string): boolean {
+  return defaultToolRegistry.has(name);
+}
+
+/**
+ * Lists registered tools from the default registry, optionally filtered by category.
+ *
+ * @param category - Optional functional category filter.
+ */
+export function listTools(category?: ToolCategory): NativeToolDefinition[] {
+  if (category) {
+    return defaultToolRegistry.getByCategory(category);
+  }
+  return defaultToolRegistry.getAll();
+}
+
+/**
+ * Returns all registered tools belonging to a specific category.
+ *
+ * @param category - Functional category name.
+ */
+export function getToolsByCategory(category: ToolCategory): NativeToolDefinition[] {
+  return defaultToolRegistry.getByCategory(category);
+}
+
+/**
+ * Returns all registered tools matching at least one tag.
+ *
+ * @param tags - Array of tag strings.
+ */
+export function getToolsByTags(tags: string[]): NativeToolDefinition[] {
+  return defaultToolRegistry.getByTags(tags);
+}
+
+/**
+ * Filters registered tools using a custom predicate function.
+ *
+ * @param predicate - Filter predicate function.
+ */
+export function filterTools(
+  predicate: (tool: NativeToolDefinition, name: string) => boolean
+): NativeToolDefinition[] {
+  return defaultToolRegistry.filter(predicate);
+}
+
+/**
+ * Registers a new native tool in the default registry.
+ * Optionally persists changes to `.hurdler/registries/tools.json`.
+ *
+ * @example
+ * ```ts
+ * registerTool({
+ *   name: 'custom_lint',
+ *   description: 'Runs custom code linter',
+ *   category: 'custom',
+ *   parameters: z.object({ path: z.string() }),
+ *   execute: async ({ path }) => ({ passed: true })
+ * });
+ * ```
+ * @param tool - Native tool definition.
+ * @param options - Optional persistence settings.
+ */
+export function registerTool(
+  tool: NativeToolDefinition,
+  options?: { persist?: boolean; targetPath?: string; projectRoot?: string }
+): void {
+  defaultToolRegistry.register(tool);
+  if (options?.persist) {
+    saveToolRegistry(options).catch((err) => {
+      devWarn('TOOL_REGISTRY', `Failed to persist registry after registering tool '${tool.name}': ${err.message}`);
+    });
+  }
+}
+
+/**
+ * Registers multiple native tools in the default registry.
+ *
+ * @param tools - Array or dictionary of tool definitions.
+ * @param options - Optional persistence settings.
+ */
+export function registerTools(
+  tools: NativeToolDefinition[] | Record<string, NativeToolDefinition>,
+  options?: { persist?: boolean; targetPath?: string; projectRoot?: string }
+): void {
+  defaultToolRegistry.registerMany(tools);
+  if (options?.persist) {
+    saveToolRegistry(options).catch((err) => {
+      devWarn('TOOL_REGISTRY', `Failed to persist registry after registering tools: ${err.message}`);
+    });
+  }
+}
+
+/**
+ * Updates an existing tool definition in the default registry with partial fields.
+ *
+ * @param name - Tool name.
+ * @param updates - Partial tool updates.
+ * @param options - Optional persistence settings.
+ */
+export function updateTool(
+  name: string,
+  updates: ToolUpdate,
+  options?: { persist?: boolean; targetPath?: string; projectRoot?: string }
+): NativeToolDefinition {
+  const updated = defaultToolRegistry.update(name, updates);
+  if (options?.persist) {
+    saveToolRegistry(options).catch((err) => {
+      devWarn('TOOL_REGISTRY', `Failed to persist registry after updating tool '${name}': ${err.message}`);
+    });
+  }
+  return updated;
+}
+
+/**
+ * Unregisters a tool from the default registry.
+ *
+ * @param name - Tool name to remove.
+ * @param options - Optional persistence settings.
+ */
+export function unregisterTool(
+  name: string,
+  options?: { persist?: boolean; targetPath?: string; projectRoot?: string }
+): boolean {
+  const removed = defaultToolRegistry.unregister(name);
+  if (removed && options?.persist) {
+    saveToolRegistry(options).catch((err) => {
+      devWarn('TOOL_REGISTRY', `Failed to persist registry after unregistering tool '${name}': ${err.message}`);
+    });
+  }
+  return removed;
+}
+
+/**
+ * Resolves registered tools matching filter criteria and converts them directly
+ * into Vercel AI SDK compatible tools dictionary (`Record<string, Tool>`).
+ *
+ * @example
+ * ```ts
+ * const aiTools = resolveTools({ categories: ['filesystem', 'editing'], readOnlyOnly: true });
+ * const result = await callLLM({ prompt: '...', tools: aiTools });
+ * ```
+ * @param options - Tool filter criteria (names, categories, tags, excludeNames, readOnlyOnly).
+ * @param context - Optional execution context (workspaceRoot, agentId, timeoutMs).
+ */
+export function resolveTools(
+  options?: ToolFilterOptions,
+  context?: ToolExecutionContext
+): Record<string, Tool> {
+  return defaultToolRegistry.resolveTools(options, context);
+}
+
+/**
+ * Directly executes a registered tool by name with input parameters and execution context.
+ *
+ * @example
+ * ```ts
+ * const result = await runTool('read_file', { path: 'src/index.ts' }, { workspaceRoot: '/app' });
+ * if (result.success) {
+ *   console.log(result.output.content);
+ * }
+ * ```
+ * @param name - Tool name.
+ * @param input - Input payload matching tool's Zod parameters schema.
+ * @param context - Optional execution context.
+ */
+export async function runTool<TInput = any, TOutput = any>(
+  name: string,
+  input: TInput,
+  context?: ToolExecutionContext
+): Promise<ToolExecutionResult<TOutput>> {
+  return defaultToolRegistry.execute<TInput, TOutput>(name, input, context);
+}
+
+/**
+ * Loads registry records from `.hurdler/registries/tools.json` into default registry.
+ */
+export async function loadToolRegistry(options?: {
+  targetPath?: string;
+  projectRoot?: string;
+}): Promise<void> {
+  await defaultToolRegistry.loadFromDisk(options);
+}
+
+/**
+ * Saves default in-memory registry to `.hurdler/registries/tools.json`.
+ */
+export async function saveToolRegistry(options?: {
+  targetPath?: string;
+  projectRoot?: string;
+}): Promise<void> {
+  await defaultToolRegistry.saveToDisk(options);
+}
+
+/**
+ * Synchronizes default in-memory registry with `.hurdler/registries/tools.json`.
+ * If file does not exist, creates it with baseline tools metadata.
+ */
+export async function syncToolRegistry(options?: {
+  targetPath?: string;
+  projectRoot?: string;
+}): Promise<void> {
+  await defaultToolRegistry.syncWithDisk(options);
+}
+
+/**
+ * Resets default registry back to baseline static tools.
+ */
+export function resetToolRegistry(): void {
+  defaultToolRegistry.reset();
+}

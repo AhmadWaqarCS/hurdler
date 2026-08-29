@@ -1,4 +1,10 @@
-import { executeWorkflow } from './engine.js';
+import {
+  executeWorkflow,
+  resolveStepExecutionOrder,
+  validateWorkflowDAG,
+  getWorkflowPrerequisites,
+  findDependentSteps,
+} from './engine.js';
 import { composeWorkflows, adaptWorkflowForModelCapability } from './composition.js';
 import {
   createExecutionContext,
@@ -27,6 +33,26 @@ export const workflowService = {
    * Adapts a workflow pipeline to match the reasoning capability of a target model tier.
    */
   adapt: adaptWorkflowForModelCapability,
+
+  /**
+   * Topologically resolves step execution order for a DAG of steps.
+   */
+  resolveOrder: resolveStepExecutionOrder,
+
+  /**
+   * Validates whether a workflow forms a valid Directed Acyclic Graph (DAG).
+   */
+  validateDAG: validateWorkflowDAG,
+
+  /**
+   * Retrieves all prerequisite steps for a given step in a workflow.
+   */
+  getPrerequisites: getWorkflowPrerequisites,
+
+  /**
+   * Retrieves all downstream steps that depend on a given step.
+   */
+  findDependents: findDependentSteps,
 
   /**
    * Creates an isolated workflow execution context.

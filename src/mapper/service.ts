@@ -9,18 +9,26 @@ import type {
   MapQueryOptions,
   RefactoringContextOptions,
   RefactoringContextResult,
+  SymbolLookupResult,
   MapStats,
   FileCategory,
   SymbolCategory,
+  MapperConfig,
 } from './types.js';
 import {
   CodebaseScanOptionsSchema,
   FileUpdateOptionsSchema,
   MapQueryOptionsSchema,
+  MapperConfigSchema,
 } from './schema.js';
 import { analyzeSourceCode, analyzeSourceFile } from './analyzer.js';
 import { saveCodebaseMap, loadCodebaseMap, isMapFilePresent } from './storage.js';
-import { buildRefactoringContext, buildDebugContext, buildFeatureContext, buildSystemMapSummary } from './context-builder.js';
+import {
+  buildRefactoringContext,
+  buildDebugContext,
+  buildFeatureContext,
+  buildSystemMapSummary,
+} from './context-builder.js';
 import { sanitizeRelativePath, computeContentHash } from './helpers.js';
 import { devInfo, devDebug, devWarn } from '../core/dev-mode/index.js';
 
@@ -109,19 +117,59 @@ function rebuildIndexes(files: Record<string, FileMapEntry>): {
 
 /**
  * Dynamic Codebase Mapper and Registry Service.
+ * Provides real-time in-memory indexing, AST analysis, querying, dependency resolution,
+ * and prompt context generation for LLMs.
  */
 export class MapperService {
   private currentMap: CodebaseMap | null = null;
+  private config: MapperConfig;
+
+  constructor(config?: Partial<MapperConfig>) {
+    this.config = MapperConfigSchema.parse(config ?? {});
+  }
+
+  /**
+   * Updates runtime configuration for the mapper service.
+   *
+   * @param config Partial configuration updates
+   * @returns this
+   *
+   * @example
+   * ```ts
+   * mapperService.configure({ autoSyncOnUpdate: true, maxFiles: 10000 });
+   * ```
+   */
+  configure(config: Partial<MapperConfig>): this {
+    this.config = MapperConfigSchema.parse({
+      ...this.config,
+      ...config,
+    });
+    devInfo('MAPPER_SERVICE', `Configured mapper service (mapDir: ${this.config.mapDir}, autoSync: ${this.config.autoSyncOnUpdate})`);
+    return this;
+  }
+
+  /**
+   * Retrieves the current configuration of the mapper service.
+   *
+   * @returns Current MapperConfig
+   */
+  getConfig(): MapperConfig {
+    return { ...this.config };
+  }
 
   /**
    * Returns true if a codebase map is loaded in memory.
+   *
+   * @returns True if currentMap is not null
    */
   hasMap(): boolean {
     return this.currentMap !== null;
   }
 
   /**
-   * Retrieves the current CodebaseMap or throws if uninitialized.
+   * Retrieves the current CodebaseMap or null if uninitialized.
+   *
+   * @returns CodebaseMap or null
    */
   getMap(): CodebaseMap | null {
     return this.currentMap;
@@ -129,6 +177,8 @@ export class MapperService {
 
   /**
    * Sets the active in-memory CodebaseMap.
+   *
+   * @param map CodebaseMap to activate
    */
   setMap(map: CodebaseMap): void {
     this.currentMap = map;
@@ -136,6 +186,9 @@ export class MapperService {
 
   /**
    * Retrieves a single indexed FileMapEntry.
+   *
+   * @param filePath Relative or absolute path of the file
+   * @returns FileMapEntry or null if not indexed
    */
   getFileMap(filePath: string): FileMapEntry | null {
     if (!this.currentMap) return null;
@@ -145,6 +198,9 @@ export class MapperService {
 
   /**
    * Retrieves all symbols matching a name across the codebase.
+   *
+   * @param name Name of the function, component, class, or schema
+   * @returns Array of matching SymbolMapEntry objects
    */
   getSymbolsByName(name: string): SymbolMapEntry[] {
     if (!this.currentMap) return [];
@@ -164,11 +220,49 @@ export class MapperService {
   }
 
   /**
+   * Retrieves detailed symbol lookup result including declaring file and consuming files.
+   *
+   * @param name Symbol name to look up
+   * @param filePath Optional file path to disambiguate
+   * @returns SymbolLookupResult or null if not found
+   */
+  getSymbolMap(name: string, filePath?: string): SymbolLookupResult | null {
+    if (!this.currentMap) return null;
+    const symbols = this.getSymbolsByName(name);
+    const matched = filePath
+      ? symbols.find((s) => s.filePath.includes(filePath))
+      : symbols[0];
+
+    if (!matched) return null;
+    const file = this.currentMap.files[matched.filePath];
+    if (!file) return null;
+
+    const importedByFiles = this.currentMap.dependencyGraph[matched.filePath]?.importedBy ?? [];
+
+    return {
+      symbol: matched,
+      file,
+      importedByFiles,
+    };
+  }
+
+  /**
    * Performs a comprehensive codebase scan, generates the map, builds indexes,
    * and optionally persists to disk.
+   *
+   * @param options Codebase scanning options
+   * @returns Generated CodebaseMap
    */
   async scanCodebase(options: Partial<CodebaseScanOptions> = {}): Promise<CodebaseMap> {
-    const parsed = CodebaseScanOptionsSchema.parse(options);
+    const parsed = CodebaseScanOptionsSchema.parse({
+      projectRoot: this.config.projectRoot,
+      mapDir: this.config.mapDir,
+      includeExtensions: this.config.includeExtensions,
+      excludePatterns: this.config.excludePatterns,
+      maxFiles: this.config.maxFiles,
+      ...options,
+    });
+
     const projectRoot = parsed.projectRoot ? path.resolve(parsed.projectRoot) : process.cwd();
     const startTime = Date.now();
 
@@ -178,7 +272,7 @@ export class MapperService {
     const includeExts = new Set(parsed.includeExtensions.map((e) => e.toLowerCase()));
     const excludePatterns = parsed.excludePatterns;
 
-    async function walk(currentDir: string): Promise<void> {
+    const walk = async (currentDir: string): Promise<void> => {
       if (Object.keys(filesMap).length >= parsed.maxFiles) return;
 
       let entries: string[] = [];
@@ -214,7 +308,7 @@ export class MapperService {
           }
         }
       }
-    }
+    };
 
     await walk(projectRoot);
 
@@ -254,7 +348,7 @@ export class MapperService {
     this.currentMap = map;
 
     if (parsed.writeToDisk) {
-      await saveCodebaseMap(map, parsed.mapDir);
+      await saveCodebaseMap(map, parsed.mapDir ?? this.config.mapDir);
     }
 
     const duration = Date.now() - startTime;
@@ -268,13 +362,24 @@ export class MapperService {
 
   /**
    * Fast incremental update for a single file (added or modified).
+   *
+   * @param filePath Path of the file
+   * @param content Optional in-memory content override
+   * @param options Incremental update options
+   * @returns Updated FileMapEntry
    */
   async updateFile(
     filePath: string,
     content?: string,
     options: Partial<FileUpdateOptions> = {}
   ): Promise<FileMapEntry> {
-    const parsed = FileUpdateOptionsSchema.parse(options);
+    const parsed = FileUpdateOptionsSchema.parse({
+      projectRoot: this.config.projectRoot,
+      mapDir: this.config.mapDir,
+      writeToDisk: this.config.autoSyncOnUpdate,
+      ...options,
+    });
+
     const projectRoot = parsed.projectRoot
       ? path.resolve(parsed.projectRoot)
       : this.currentMap?.projectRoot ?? process.cwd();
@@ -330,7 +435,7 @@ export class MapperService {
 
     if (parsed.writeToDisk) {
       try {
-        await saveCodebaseMap(this.currentMap, parsed.mapDir);
+        await saveCodebaseMap(this.currentMap, parsed.mapDir ?? this.config.mapDir);
       } catch (err: any) {
         devWarn('MAPPER_SERVICE', `Failed to write map to disk on update: ${err.message}`);
       }
@@ -342,6 +447,10 @@ export class MapperService {
 
   /**
    * Removes a deleted file from the active map and prunes indexes.
+   *
+   * @param filePath Path of the file to remove
+   * @param options Incremental update options
+   * @returns True if removed, false if not found
    */
   async removeFile(
     filePath: string,
@@ -349,7 +458,13 @@ export class MapperService {
   ): Promise<boolean> {
     if (!this.currentMap) return false;
 
-    const parsed = FileUpdateOptionsSchema.parse(options);
+    const parsed = FileUpdateOptionsSchema.parse({
+      projectRoot: this.config.projectRoot,
+      mapDir: this.config.mapDir,
+      writeToDisk: this.config.autoSyncOnUpdate,
+      ...options,
+    });
+
     const relPath = sanitizeRelativePath(filePath, this.currentMap.projectRoot);
 
     if (!this.currentMap.files[relPath]) return false;
@@ -371,7 +486,7 @@ export class MapperService {
 
     if (parsed.writeToDisk) {
       try {
-        await saveCodebaseMap(this.currentMap, parsed.mapDir);
+        await saveCodebaseMap(this.currentMap, parsed.mapDir ?? this.config.mapDir);
       } catch (err: any) {
         devWarn('MAPPER_SERVICE', `Failed to write map to disk on remove: ${err.message}`);
       }
@@ -383,6 +498,9 @@ export class MapperService {
 
   /**
    * Queries files and symbols using flexible filter criteria.
+   *
+   * @param options Query filter and pagination options
+   * @returns Filtered files and symbols with total counts
    */
   query(options: Partial<MapQueryOptions> = {}): {
     files: FileMapEntry[];
@@ -394,7 +512,10 @@ export class MapperService {
       return { files: [], symbols: [], totalMatchingFiles: 0, totalMatchingSymbols: 0 };
     }
 
-    const parsed = MapQueryOptionsSchema.parse(options);
+    const parsed = MapQueryOptionsSchema.parse({
+      limit: this.config.defaultLimit,
+      ...options,
+    });
     const q = parsed.query?.toLowerCase();
 
     let matchedFiles = Object.values(this.currentMap.files);
@@ -463,6 +584,10 @@ export class MapperService {
 
   /**
    * Generates refactoring context for a target file or symbol.
+   *
+   * @param target File path or symbol identifier
+   * @param options Refactoring context options
+   * @returns RefactoringContextResult
    */
   buildRefactoringContext(
     target: string,
@@ -476,6 +601,10 @@ export class MapperService {
 
   /**
    * Generates debug context for a file and function.
+   *
+   * @param filePath Relative path of the file
+   * @param functionName Optional function name
+   * @returns Formatted debug context markdown
    */
   buildDebugContext(filePath: string, functionName?: string): string {
     if (!this.currentMap) {
@@ -486,6 +615,10 @@ export class MapperService {
 
   /**
    * Generates feature implementation context based on keywords.
+   *
+   * @param keywords Search keywords
+   * @param categories Optional category filter
+   * @returns Formatted feature context markdown
    */
   buildFeatureContext(keywords: string[], categories?: FileCategory[]): string {
     if (!this.currentMap) {
@@ -496,6 +629,8 @@ export class MapperService {
 
   /**
    * Generates a concise system prompt summary of the architecture.
+   *
+   * @returns Compact summary string
    */
   buildSystemMapSummary(): string {
     if (!this.currentMap) return '';
@@ -504,19 +639,25 @@ export class MapperService {
 
   /**
    * Persists active map to disk.
+   *
+   * @param targetDir Optional target directory override
    */
   async saveMap(targetDir?: string): Promise<void> {
     if (!this.currentMap) {
       throw new Error('No active codebase map to save.');
     }
-    await saveCodebaseMap(this.currentMap, targetDir);
+    await saveCodebaseMap(this.currentMap, targetDir ?? this.config.mapDir);
   }
 
   /**
    * Loads map from disk into memory.
+   *
+   * @param targetDir Optional target directory override
+   * @param projectRoot Project root directory
+   * @returns Loaded CodebaseMap or null
    */
   async loadMap(targetDir?: string, projectRoot = process.cwd()): Promise<CodebaseMap | null> {
-    const map = await loadCodebaseMap(targetDir, projectRoot);
+    const map = await loadCodebaseMap(targetDir ?? this.config.mapDir, projectRoot);
     if (map) {
       this.currentMap = map;
     }
@@ -525,9 +666,28 @@ export class MapperService {
 
   /**
    * Checks if a map file is present on disk.
+   *
+   * @param targetDir Optional target directory override
+   * @param projectRoot Project root directory
+   * @returns True if present
    */
   async isMapPresent(targetDir?: string, projectRoot = process.cwd()): Promise<boolean> {
-    return isMapFilePresent(targetDir, projectRoot);
+    return isMapFilePresent(targetDir ?? this.config.mapDir, projectRoot);
+  }
+
+  /**
+   * Clears the active in-memory map.
+   */
+  resetMap(): void {
+    this.currentMap = null;
+    devInfo('MAPPER_SERVICE', 'Cleared in-memory codebase map');
+  }
+
+  /**
+   * Alias for resetMap().
+   */
+  clearMap(): void {
+    this.resetMap();
   }
 }
 
@@ -535,3 +695,259 @@ export class MapperService {
  * Global default singleton instance of MapperService.
  */
 export const defaultMapperService = new MapperService();
+
+// ===========================================================================
+// Standalone Functional API Layer (Function-First Architecture)
+// ===========================================================================
+
+/**
+ * Configures the default mapper service runtime settings.
+ *
+ * @param config Configuration options
+ * @returns Updated MapperConfig
+ *
+ * @example
+ * ```ts
+ * configureMapper({ mapDir: '.hurdler/maps', autoSyncOnUpdate: true });
+ * ```
+ */
+export function configureMapper(config: Partial<MapperConfig>): MapperConfig {
+  defaultMapperService.configure(config);
+  return defaultMapperService.getConfig();
+}
+
+/**
+ * Retrieves the current default mapper service configuration.
+ *
+ * @returns Current MapperConfig
+ */
+export function getMapperConfig(): MapperConfig {
+  return defaultMapperService.getConfig();
+}
+
+/**
+ * Scans the codebase, extracts AST symbols, builds dependency graphs,
+ * and persists maps to `.hurdler/maps/`.
+ *
+ * @param options Scanning options
+ * @returns Promise resolving to the generated CodebaseMap
+ *
+ * @example
+ * ```ts
+ * const map = await scanCodebase({ projectRoot: process.cwd(), writeToDisk: true });
+ * console.log(`Mapped ${map.totalFiles} files with ${map.totalSymbols} symbols`);
+ * ```
+ */
+export async function scanCodebase(
+  options?: Partial<CodebaseScanOptions>
+): Promise<CodebaseMap> {
+  return defaultMapperService.scanCodebase(options);
+}
+
+/**
+ * Incrementally updates or adds a file in the active codebase map.
+ *
+ * @param filePath Relative or absolute path of the file
+ * @param content Optional in-memory content
+ * @param options Incremental update options
+ * @returns Promise resolving to the updated FileMapEntry
+ *
+ * @example
+ * ```ts
+ * const entry = await updateCodebaseFile('src/utils/math.ts', 'export function add(a: number, b: number) { return a + b; }');
+ * ```
+ */
+export async function updateCodebaseFile(
+  filePath: string,
+  content?: string,
+  options?: Partial<FileUpdateOptions>
+): Promise<FileMapEntry> {
+  return defaultMapperService.updateFile(filePath, content, options);
+}
+
+/**
+ * Incrementally removes a file from the active codebase map.
+ *
+ * @param filePath Path of the file to remove
+ * @param options Incremental update options
+ * @returns Promise resolving to true if removed
+ */
+export async function removeCodebaseFile(
+  filePath: string,
+  options?: Partial<FileUpdateOptions>
+): Promise<boolean> {
+  return defaultMapperService.removeFile(filePath, options);
+}
+
+/**
+ * Retrieves the current active in-memory CodebaseMap or null if none loaded.
+ *
+ * @returns Active CodebaseMap or null
+ */
+export function getCodebaseMap(): CodebaseMap | null {
+  return defaultMapperService.getMap();
+}
+
+/**
+ * Sets the active in-memory CodebaseMap.
+ *
+ * @param map CodebaseMap to set
+ */
+export function setCodebaseMap(map: CodebaseMap): void {
+  defaultMapperService.setMap(map);
+}
+
+/**
+ * Checks if a codebase map is loaded in memory.
+ *
+ * @returns True if map is loaded
+ */
+export function hasCodebaseMap(): boolean {
+  return defaultMapperService.hasMap();
+}
+
+/**
+ * Retrieves a single indexed FileMapEntry from the active map.
+ *
+ * @param filePath Relative or absolute file path
+ * @returns FileMapEntry or null
+ */
+export function getFileMap(filePath: string): FileMapEntry | null {
+  return defaultMapperService.getFileMap(filePath);
+}
+
+/**
+ * Retrieves all symbols matching a given name across the codebase.
+ *
+ * @param name Symbol name to look up
+ * @returns Array of SymbolMapEntry
+ */
+export function getSymbolsByName(name: string): SymbolMapEntry[] {
+  return defaultMapperService.getSymbolsByName(name);
+}
+
+/**
+ * Retrieves detailed symbol metadata, file context, and callers.
+ *
+ * @param name Symbol name
+ * @param filePath Optional file path disambiguation
+ * @returns SymbolLookupResult or null
+ */
+export function getSymbolMap(name: string, filePath?: string): SymbolLookupResult | null {
+  return defaultMapperService.getSymbolMap(name, filePath);
+}
+
+/**
+ * Queries the active codebase map using rich filter parameters.
+ *
+ * @param options Query filters and pagination options
+ * @returns Filtered files and symbols
+ *
+ * @example
+ * ```ts
+ * const results = queryCodebase({ symbolKind: 'function', exportedOnly: true, limit: 10 });
+ * ```
+ */
+export function queryCodebase(options?: Partial<MapQueryOptions>) {
+  return defaultMapperService.query(options);
+}
+
+/**
+ * Builds refactoring context with caller analysis and upstream dependencies for a target file or symbol.
+ *
+ * @param target File path or symbol name/ID
+ * @param options Refactoring options
+ * @returns RefactoringContextResult
+ */
+export function getRefactoringContext(
+  target: string,
+  options?: Partial<RefactoringContextOptions>
+): RefactoringContextResult {
+  return defaultMapperService.buildRefactoringContext(target, options);
+}
+
+/**
+ * Builds targeted debugging context for a file and function.
+ *
+ * @param filePath File path
+ * @param functionName Optional function name
+ * @returns Formatted debug context string
+ */
+export function getDebugContext(filePath: string, functionName?: string): string {
+  return defaultMapperService.buildDebugContext(filePath, functionName);
+}
+
+/**
+ * Builds feature implementation context based on keywords and categories.
+ *
+ * @param keywords Search keywords
+ * @param categories Optional category filters
+ * @returns Formatted feature context string
+ */
+export function getFeatureContext(
+  keywords: string[],
+  categories?: FileCategory[]
+): string {
+  return defaultMapperService.buildFeatureContext(keywords, categories);
+}
+
+/**
+ * Generates a concise system prompt summary of the codebase architecture.
+ *
+ * @returns Architectural summary string
+ */
+export function getSystemMapSummary(): string {
+  return defaultMapperService.buildSystemMapSummary();
+}
+
+/**
+ * Persists the active codebase map to disk.
+ *
+ * @param targetDir Optional target directory override
+ */
+export async function saveActiveMap(targetDir?: string): Promise<void> {
+  return defaultMapperService.saveMap(targetDir);
+}
+
+/**
+ * Loads a codebase map from disk into memory.
+ *
+ * @param targetDir Optional target directory override
+ * @param projectRoot Project root path
+ * @returns Promise resolving to loaded CodebaseMap or null
+ */
+export async function loadActiveMap(
+  targetDir?: string,
+  projectRoot = process.cwd()
+): Promise<CodebaseMap | null> {
+  return defaultMapperService.loadMap(targetDir, projectRoot);
+}
+
+/**
+ * Checks if a persisted map file exists on disk.
+ *
+ * @param targetDir Optional target directory override
+ * @param projectRoot Project root path
+ * @returns Promise resolving to boolean
+ */
+export async function isMapPresent(
+  targetDir?: string,
+  projectRoot = process.cwd()
+): Promise<boolean> {
+  return defaultMapperService.isMapPresent(targetDir, projectRoot);
+}
+
+/**
+ * Clears the active in-memory codebase map.
+ */
+export function resetMap(): void {
+  defaultMapperService.resetMap();
+}
+
+/**
+ * Alias for resetMap().
+ */
+export function clearMap(): void {
+  defaultMapperService.clearMap();
+}
+

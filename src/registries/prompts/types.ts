@@ -4,12 +4,26 @@ import type {
   PromptDefinitionSchema,
   PromptCompositionOptionsSchema,
   PromptRenderOptionsSchema,
+  PromptUpdateSchema,
+  PromptRegistryConfigSchema,
 } from './schema.js';
 
 export type PromptCategory = z.infer<typeof PromptCategorySchema>;
 export type PromptDefinition = z.infer<typeof PromptDefinitionSchema>;
 export type PromptCompositionOptions = z.infer<typeof PromptCompositionOptionsSchema>;
 export type PromptRenderOptions = z.infer<typeof PromptRenderOptionsSchema>;
+export type PromptUpdate = z.infer<typeof PromptUpdateSchema>;
+export type PromptRegistryConfig = z.infer<typeof PromptRegistryConfigSchema>;
+
+/**
+ * Options for disk storage operations.
+ */
+export interface PromptStorageOptions {
+  /** Custom disk file path (defaults to .hurdler/registries/prompts.json) */
+  customPath?: string;
+  /** Whether to format the serialized JSON with indentation */
+  pretty?: boolean;
+}
 
 /**
  * Result of composing one or more prompts for a workflow or LLM invocation.
@@ -44,3 +58,4 @@ export interface PromptCacheStats {
   /** Current number of cached entries */
   size: number;
 }
+

@@ -1,10 +1,14 @@
 import { HurdlerError } from '../../core/errors/base-error.js';
 
 export class ToolNotFoundError extends HurdlerError {
-  constructor(toolName: string) {
-    super(`Tool '${toolName}' was not found in the tools registry.`, {
+  constructor(toolName: string, availableTools: string[] = []) {
+    const hint =
+      availableTools.length > 0
+        ? ` Available tools in registry: ${availableTools.join(', ')}.`
+        : ` No tools are registered. You can register tools using registerTool().`;
+    super(`Tool '${toolName}' was not found in the tools registry.${hint}`, {
       code: 'TOOL_NOT_FOUND',
-      details: { toolName },
+      details: { toolName, availableTools },
     });
   }
 }
@@ -23,6 +27,16 @@ export class ToolValidationError extends HurdlerError {
     super(`Validation failed for tool '${toolName}': ${JSON.stringify(issues)}`, {
       code: 'TOOL_VALIDATION_ERROR',
       details: { toolName, issues },
+    });
+  }
+}
+
+export class ToolStorageError extends HurdlerError {
+  constructor(filePath: string, operation: 'read' | 'write' | 'validate', message: string, cause?: unknown) {
+    super(`Failed to ${operation} tool registry at '${filePath}': ${message}`, {
+      code: 'TOOL_STORAGE_ERROR',
+      details: { filePath, operation },
+      cause,
     });
   }
 }
@@ -58,3 +72,4 @@ export class FileOperationError extends HurdlerError {
     });
   }
 }
+

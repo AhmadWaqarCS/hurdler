@@ -4,10 +4,13 @@ import type {
   ValidateAndPrettifyResult,
   CodeContextOptions,
   CodeContextResult,
+  BatchValidateAndPrettifyOptions,
+  BatchValidateAndPrettifyResult,
 } from './types.js';
 import {
   ValidateAndPrettifyOptionsSchema,
   CodeContextOptionsSchema,
+  BatchValidateAndPrettifyOptionsSchema,
 } from './schema.js';
 import { lintText, lintFile } from './lint/linter.js';
 import { formatLintForLLM } from './lint/formatter.js';
@@ -106,6 +109,78 @@ export async function validateAndPrettify(
 }
 
 /**
+ * Concurrently validates and prettifies multiple files on disk in batch.
+ * If lint passes, formats with Prettier. If lint fails, returns diagnostic messages.
+ */
+export async function batchValidateAndPrettify(
+  filePaths: string[],
+  options: BatchValidateAndPrettifyOptions = {}
+): Promise<BatchValidateAndPrettifyResult> {
+  const parsed = BatchValidateAndPrettifyOptionsSchema.parse(options);
+  const concurrency = parsed.concurrency ?? 4;
+  const validFiles: string[] = [];
+  const formattedFiles: string[] = [];
+  const invalidFiles: Array<{
+    filePath: string;
+    errorCount: number;
+    warningCount: number;
+    messages: any[];
+    llmDiagnosticSummary?: string;
+  }> = [];
+
+  for (let i = 0; i < filePaths.length; i += concurrency) {
+    const chunk = filePaths.slice(i, i + concurrency);
+    const chunkPromises = chunk.map(async (filePath) => {
+      try {
+        const res = await validateAndPrettify(filePath, {
+          fixLint: parsed.fixLint,
+          projectRoot: parsed.projectRoot,
+          ruleOverrides: parsed.ruleOverrides,
+          prettierOptions: parsed.prettierOptions,
+        });
+
+        if (res.isValid) {
+          validFiles.push(filePath);
+          if (res.formatted) {
+            formattedFiles.push(filePath);
+          }
+        } else {
+          invalidFiles.push({
+            filePath,
+            errorCount: res.errorCount,
+            warningCount: res.warningCount,
+            messages: res.messages,
+            llmDiagnosticSummary: res.llmDiagnosticSummary,
+          });
+        }
+      } catch (err: any) {
+        invalidFiles.push({
+          filePath,
+          errorCount: 1,
+          warningCount: 0,
+          messages: [],
+          llmDiagnosticSummary: `Pipeline exception on file: ${err.message}`,
+        });
+      }
+    });
+    await Promise.all(chunkPromises);
+  }
+
+  return {
+    totalFiles: filePaths.length,
+    validFiles,
+    invalidFiles,
+    formattedFiles,
+    success: invalidFiles.length === 0,
+  };
+}
+
+/**
+ * Convenient alias for validateAndPrettify.
+ */
+export const lintAndPrettify = validateAndPrettify;
+
+/**
  * Generates rich AST context (outline, symbol tree, diffs) for LLM prompts.
  */
 export async function generateCodeContext(
@@ -133,3 +208,4 @@ export async function generateCodeContext(
     astDiff,
   };
 }
+

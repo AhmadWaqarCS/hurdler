@@ -10,7 +10,7 @@ import type {
 } from './types.js';
 import type { TokenUsage, CostBreakdown } from '../llms/billing/types.js';
 import { codeService } from '../code/service.js';
-import { defaultMapperService } from '../mapper/service.js';
+import { updateCodebaseFile, removeCodebaseFile } from '../mapper/service.js';
 import { devDebug } from '../core/dev-mode/index.js';
 
 
@@ -128,15 +128,15 @@ export function recordFileChange(
     }
   }
 
-  // Synchronize with MapperService dynamic registry
+  // Synchronize with Mapper dynamic registry
   try {
     if (action === 'deleted') {
-      defaultMapperService.removeFile(normalizedPath, {
+      removeCodebaseFile(normalizedPath, {
         projectRoot: context.projectRoot,
         writeToDisk: !context.dryRun,
       });
     } else if (content) {
-      defaultMapperService.updateFile(normalizedPath, content, {
+      updateCodebaseFile(normalizedPath, content, {
         projectRoot: context.projectRoot,
         writeToDisk: !context.dryRun,
       });

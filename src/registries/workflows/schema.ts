@@ -151,6 +151,22 @@ export const WorkflowQueryFilterSchema = z.object({
   agentId: z.string().optional(),
   search: z.string().optional(),
   isBuiltin: z.boolean().optional(),
-  activeOnly: z.boolean().default(true),
+  activeOnly: z.boolean().optional().default(true),
   targetFramework: z.string().optional(),
 });
+
+export const WorkflowRegistryMapSchema = z.record(z.string(), WorkflowDefinitionSchema);
+
+export const WorkflowUpdateSchema = WorkflowDefinitionSchema.partial().omit({ id: true });
+
+export const WorkflowStorageOptionsSchema = z.object({
+  /** Whether to persist changes to .hurdler/registries/workflows.json */
+  persist: z.boolean().default(false),
+  /** Force overwrite/delete even if the item is built-in */
+  force: z.boolean().default(false),
+  /** Custom storage file path override */
+  targetPath: z.string().optional(),
+  /** Custom project root override */
+  projectRoot: z.string().optional(),
+});
+

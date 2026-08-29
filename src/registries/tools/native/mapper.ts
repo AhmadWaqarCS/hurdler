@@ -1,5 +1,12 @@
 import { z } from 'zod';
-import { defaultMapperService } from '../../../mapper/service.js';
+import {
+  scanCodebase,
+  queryCodebase,
+  getSymbolsByName,
+  getFileMap,
+  getRefactoringContext,
+  hasCodebaseMap,
+} from '../../../mapper/service.js';
 import {
   FileCategorySchema,
   SymbolCategorySchema,
@@ -24,7 +31,7 @@ export const mapCodebaseTool: NativeToolDefinition = {
   }),
   execute: async (input, context) => {
     const root = input.projectRoot ?? context?.workspaceRoot ?? process.cwd();
-    const map = await defaultMapperService.scanCodebase({
+    const map = await scanCodebase({
       projectRoot: root,
       forceRescan: input.forceRescan,
       writeToDisk: true,
@@ -64,11 +71,11 @@ export const queryCodebaseMapTool: NativeToolDefinition = {
     limit: z.number().int().positive().optional().default(20).describe('Maximum number of results to return'),
   }),
   execute: async (input) => {
-    if (!defaultMapperService.hasMap()) {
-      await defaultMapperService.scanCodebase({ writeToDisk: true });
+    if (!hasCodebaseMap()) {
+      await scanCodebase({ writeToDisk: true });
     }
 
-    const results = defaultMapperService.query({
+    const results = queryCodebase({
       query: input.query,
       category: input.category,
       symbolCategory: input.symbolCategory,
@@ -121,11 +128,11 @@ export const getSymbolMapTool: NativeToolDefinition = {
     filePath: z.string().optional().describe('Optional file path to disambiguate if multiple symbols share the same name'),
   }),
   execute: async (input) => {
-    if (!defaultMapperService.hasMap()) {
-      await defaultMapperService.scanCodebase({ writeToDisk: true });
+    if (!hasCodebaseMap()) {
+      await scanCodebase({ writeToDisk: true });
     }
 
-    const symbols = defaultMapperService.getSymbolsByName(input.symbolName);
+    const symbols = getSymbolsByName(input.symbolName);
     let matched = symbols;
     if (input.filePath) {
       matched = symbols.filter((s) => s.filePath.includes(input.filePath!));
@@ -161,11 +168,11 @@ export const getFileMapTool: NativeToolDefinition = {
     filePath: z.string().describe('Path of the file to inspect (e.g. src/services/user.service.ts)'),
   }),
   execute: async (input) => {
-    if (!defaultMapperService.hasMap()) {
-      await defaultMapperService.scanCodebase({ writeToDisk: true });
+    if (!hasCodebaseMap()) {
+      await scanCodebase({ writeToDisk: true });
     }
 
-    const fileMap = defaultMapperService.getFileMap(input.filePath);
+    const fileMap = getFileMap(input.filePath);
     if (!fileMap) {
       return {
         success: false,
@@ -197,12 +204,12 @@ export const getRefactoringContextTool: NativeToolDefinition = {
     includeDependencies: z.boolean().optional().default(true).describe('Whether to include upstream imported files and symbols'),
   }),
   execute: async (input) => {
-    if (!defaultMapperService.hasMap()) {
-      await defaultMapperService.scanCodebase({ writeToDisk: true });
+    if (!hasCodebaseMap()) {
+      await scanCodebase({ writeToDisk: true });
     }
 
     try {
-      const refactorCtx = defaultMapperService.buildRefactoringContext(input.target, {
+      const refactorCtx = getRefactoringContext(input.target, {
         includeCallers: input.includeCallers,
         includeDependencies: input.includeDependencies,
       });

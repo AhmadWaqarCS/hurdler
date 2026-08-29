@@ -125,3 +125,20 @@ export const CodeContextOptionsSchema = z.object({
   includeSymbols: z.boolean().optional().default(true),
   includeDiffFrom: z.string().optional(),
 });
+
+export const BatchValidateAndPrettifyOptionsSchema = z.object({
+  fixLint: z.boolean().optional().default(false),
+  projectRoot: z.string().optional(),
+  concurrency: z.number().int().positive().optional().default(4),
+  ruleOverrides: z.record(z.string(), z.unknown()).optional(),
+  prettierOptions: PrettifyOptionsSchema.optional(),
+});
+
+export const ProjectCodeConfigSchema = z.object({
+  lintRuleOverrides: z.record(z.string(), z.unknown()).optional().default({}),
+  defaultPrettierOptions: PrettifyOptionsSchema.optional(),
+  outlineDefaults: OutlineOptionsSchema.optional(),
+  codebaseScanner: CodebaseOutlineOptionsSchema.optional(),
+  concurrency: z.number().int().positive().optional().default(4),
+});
+
