@@ -1030,6 +1030,43 @@ describe('Calculator', () => {
     recommendedCompanions: ['vitest', 'react', 'react-dom'],
   },
 
+  playwright: {
+    name: 'playwright',
+    displayName: 'Playwright End-to-End & UI Testing Engine',
+    category: 'testing',
+    description:
+      'Cross-browser end-to-end automation and UI testing framework supporting Chromium, Firefox, and WebKit with visual regression, headless automation, and screenshot capabilities.',
+    docUrl: 'https://playwright.dev/docs/intro',
+    repoUrl: 'https://github.com/microsoft/playwright',
+    npmUrl: 'https://www.npmjs.com/package/playwright',
+    recommendedVersion: '^1.50.0',
+    pinnedVersion: '1.50.0',
+    minNodeVersion: '>=18.0.0',
+    isDevDependency: true,
+    runtime: ['node'],
+    packageType: 'esm',
+    tags: ['playwright', 'testing', 'e2e', 'automation', 'browser', 'ui', 'screenshot'],
+    peerDependencies: [],
+    recommendedCompanions: ['@types/node'],
+    bestPractices: [
+      'Use headless mode for CI/CD and agent automated workflows.',
+      'Capture JPEG compressed screenshots (quality: 75) to minimize token and bandwidth costs for multimodal LLM vision processing.',
+      'Use locator assertions with automatic waiting instead of arbitrary sleep timers.',
+      'Isolate browser contexts per test to eliminate state leakage between test steps.',
+    ],
+    exampleUsage: `import { chromium } from 'playwright';
+
+export async function testHomePage(baseUrl = 'http://localhost:3000') {
+  const browser = await chromium.launch({ headless: true });
+  const page = await browser.newPage();
+  await page.goto(baseUrl);
+  const title = await page.title();
+  const screenshotBuffer = await page.screenshot({ type: 'jpeg', quality: 75 });
+  await browser.close();
+  return { title, screenshotBuffer };
+}`,
+  },
+
   // -------------------------------------------------------------
   // Utilities
   // -------------------------------------------------------------

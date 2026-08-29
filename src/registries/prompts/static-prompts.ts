@@ -103,6 +103,30 @@ export const STATIC_PROMPTS: Record<string, PromptDefinition> = {
     priority: 40,
     tags: ['system', 'debugging', 'refactoring'],
   },
+  'system:playwright-testing': {
+    id: 'system:playwright-testing',
+    title: 'Playwright E2E & Browser Automation Testing',
+    category: 'system',
+    content:
+      'Author and execute deterministic Playwright end-to-end tests and browser actions. Capture JPEG compressed screenshots (quality: 75) at key checkpoints to verify visual state and minimize token costs. Assert element visibility, text values, URL routes, and network health defensively.',
+    description: 'Directs browser automation, Playwright action execution, and end-to-end testing.',
+    variables: [],
+    cacheable: true,
+    priority: 42,
+    tags: ['system', 'playwright', 'testing', 'automation', 'e2e'],
+  },
+  'system:ui-visual-inspection': {
+    id: 'system:ui-visual-inspection',
+    title: 'UI Visual & Aesthetic Inspection',
+    category: 'system',
+    content:
+      'Reason over captured visual screenshots (JPEG), rendered DOM HTML structures, and correlated component source code. Verify design token harmony, typography hierarchy, responsive spacing, contrast, micro-animations, and alignment. Identify UI defects and specify surgical component refactorings.',
+    description: 'Instructs multimodal LLM reasoning over visual UI screenshots and DOM structure.',
+    variables: [],
+    cacheable: true,
+    priority: 45,
+    tags: ['system', 'ui', 'design', 'visual', 'inspection', 'screenshot'],
+  },
 
   // --- Agent Prompts ---
   'agent:orchestrator': {

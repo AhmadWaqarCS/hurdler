@@ -28,5 +28,6 @@ export default defineConfig({
     '@ai-sdk/google',
     '@ai-sdk/google-vertex',
     'dotenv',
+    'playwright',
   ],
 });

@@ -44,6 +44,21 @@ export const WorkflowStepLintActionSchema = z.object({
   maxDebugRetries: z.number().int().min(0).max(5).default(3),
 });
 
+export const WorkflowStepPlaywrightActionSchema = z.object({
+  /** Target URL for automated inspection or test run */
+  url: z.string().optional(),
+  /** Optional interactive actions to run */
+  actions: z.array(z.record(z.string(), z.unknown())).optional(),
+  /** Whether to take compressed JPEG screenshot */
+  captureScreenshot: z.boolean().default(true),
+  /** JPEG compression quality (1-100) */
+  screenshotQuality: z.number().int().min(1).max(100).default(75),
+  /** Full page screenshot */
+  fullPage: z.boolean().default(false),
+  /** Whether to invoke auto-debug if assertions fail */
+  autoDebug: z.boolean().default(true),
+});
+
 export const WorkflowStepDefinitionSchema: z.ZodType<any> = z.lazy(() =>
   z.object({
     /** Unique step identifier within the workflow (e.g. 'scaffold-domain', 'build-ui') */
@@ -84,6 +99,8 @@ export const WorkflowStepDefinitionSchema: z.ZodType<any> = z.lazy(() =>
     gitAction: WorkflowStepGitActionSchema.optional(),
     /** Automated ESLint & Prettier verification actions */
     lintAction: WorkflowStepLintActionSchema.optional(),
+    /** Automated Playwright browser verification actions */
+    playwrightAction: WorkflowStepPlaywrightActionSchema.optional(),
     /** Maximum step retries on failure */
     maxRetries: z.number().int().min(0).default(0),
     /** If true, workflow continues even if this step fails */

@@ -4,6 +4,7 @@ import type {
   WorkflowExecutionModeSchema,
   WorkflowStepGitActionSchema,
   WorkflowStepLintActionSchema,
+  WorkflowStepPlaywrightActionSchema,
   WorkflowStepDefinitionSchema,
   WorkflowDefinitionSchema,
   WorkflowQueryFilterSchema,
@@ -13,6 +14,7 @@ export type WorkflowCategory = z.infer<typeof WorkflowCategorySchema>;
 export type WorkflowExecutionMode = z.infer<typeof WorkflowExecutionModeSchema>;
 export type WorkflowStepGitAction = z.infer<typeof WorkflowStepGitActionSchema>;
 export type WorkflowStepLintAction = z.infer<typeof WorkflowStepLintActionSchema>;
+export type WorkflowStepPlaywrightAction = z.infer<typeof WorkflowStepPlaywrightActionSchema>;
 export type WorkflowStepDefinition = z.infer<typeof WorkflowStepDefinitionSchema>;
 export type WorkflowDefinition = z.infer<typeof WorkflowDefinitionSchema>;
 export type WorkflowQueryFilter = z.infer<typeof WorkflowQueryFilterSchema>;

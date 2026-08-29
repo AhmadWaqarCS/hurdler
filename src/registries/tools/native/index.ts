@@ -25,6 +25,13 @@ import {
   getFileMapTool,
   getRefactoringContextTool,
 } from './mapper.js';
+import {
+  playwrightNavigateAndScreenshotTool,
+  playwrightInspectPageTool,
+  playwrightRunActionsTool,
+  playwrightCaptureUIContextTool,
+  playwrightRunTestSuiteTool,
+} from './playwright.js';
 import type { NativeToolDefinition } from '../types.js';
 
 export * from './fs-read.js';
@@ -33,6 +40,7 @@ export * from './fs-edit.js';
 export * from './fs-dir.js';
 export * from './git.js';
 export * from './mapper.js';
+export * from './playwright.js';
 
 /**
  * Standard registry dictionary of all built-in native software engineering tools.
@@ -76,6 +84,13 @@ export const STATIC_TOOLS: Record<string, NativeToolDefinition> = {
   [getSymbolMapTool.name]: getSymbolMapTool,
   [getFileMapTool.name]: getFileMapTool,
   [getRefactoringContextTool.name]: getRefactoringContextTool,
+
+  // Playwright operations
+  [playwrightNavigateAndScreenshotTool.name]: playwrightNavigateAndScreenshotTool,
+  [playwrightInspectPageTool.name]: playwrightInspectPageTool,
+  [playwrightRunActionsTool.name]: playwrightRunActionsTool,
+  [playwrightCaptureUIContextTool.name]: playwrightCaptureUIContextTool,
+  [playwrightRunTestSuiteTool.name]: playwrightRunTestSuiteTool,
 };
 
 

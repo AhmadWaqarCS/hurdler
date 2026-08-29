@@ -43,6 +43,7 @@
     "ai": "^7.0.84",
     "dotenv": "^17.4.2",
     "eslint": "^10.9.1",
+    "playwright": "^1.62.1",
     "prettier": "^3.9.6",
     "simple-git": "^3.36.0",
     "tree-sitter": "^0.25.1",

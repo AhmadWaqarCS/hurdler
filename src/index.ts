@@ -27,4 +27,5 @@ export * from './workflows/index.js';
 // Mapper & Dynamic Registry Subsystem
 export * from './mapper/index.js';
 
-
+// Playwright Testing & UI Multimodal Subsystem
+export * from './playwright/index.js';
