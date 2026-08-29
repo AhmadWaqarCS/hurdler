@@ -29,3 +29,6 @@ export * from './mapper/index.js';
 
 // Playwright Testing & UI Multimodal Subsystem
 export * from './playwright/index.js';
+
+// CLI & Command Dispatcher Subsystem
+export * from './cli/index.js';
