@@ -17,6 +17,12 @@ import {
   gitBranchCheckoutTool,
   gitStageAndCommitTool,
   gitShowFileTool,
+  gitMergeTool,
+  gitPRCreateTool,
+  gitPRListTool,
+  gitPRReviewTool,
+  gitIssueCreateTool,
+  gitIssueListTool,
 } from './git.js';
 import {
   mapCodebaseTool,
@@ -77,6 +83,12 @@ export const STATIC_TOOLS: Record<string, NativeToolDefinition> = {
   [gitBranchCheckoutTool.name]: gitBranchCheckoutTool,
   [gitStageAndCommitTool.name]: gitStageAndCommitTool,
   [gitShowFileTool.name]: gitShowFileTool,
+  [gitMergeTool.name]: gitMergeTool,
+  [gitPRCreateTool.name]: gitPRCreateTool,
+  [gitPRListTool.name]: gitPRListTool,
+  [gitPRReviewTool.name]: gitPRReviewTool,
+  [gitIssueCreateTool.name]: gitIssueCreateTool,
+  [gitIssueListTool.name]: gitIssueListTool,
 
   // Mapper operations
   [mapCodebaseTool.name]: mapCodebaseTool,
@@ -92,5 +104,3 @@ export const STATIC_TOOLS: Record<string, NativeToolDefinition> = {
   [playwrightCaptureUIContextTool.name]: playwrightCaptureUIContextTool,
   [playwrightRunTestSuiteTool.name]: playwrightRunTestSuiteTool,
 };
-
-

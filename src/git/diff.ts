@@ -3,7 +3,17 @@ import type { DiffOptions, DiffResult } from './types.js';
 import { parseCommaSeparatedList } from '../common/helpers.js';
 
 /**
- * Retrieves diff summary and patch between working directory, index, or branches.
+ * Retrieves full diff output and per-file change statistics between working directory, index, or branches.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Diff query options (staged, baseRef, targetRef, filePaths, ignoreWhitespace).
+ * @returns Structured DiffResult containing raw patch text and parsed per-file statistics.
+ *
+ * @example
+ * ```typescript
+ * const diff = await getDiff('/my-repo', { staged: true });
+ * console.log(diff.files[0]?.file, diff.files[0]?.insertions);
+ * ```
  */
 export async function getDiff(repoPath: string, options?: DiffOptions): Promise<DiffResult> {
   return withGitErrorHandling('getDiff', repoPath, async (client) => {
@@ -46,7 +56,34 @@ export async function getDiff(repoPath: string, options?: DiffOptions): Promise<
 }
 
 /**
- * Retrieves diff for a single file.
+ * Retrieves concise diff statistics summary without the full patch payload.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Diff query options.
+ * @returns Array of per-file change statistics.
+ *
+ * @example
+ * ```typescript
+ * const summary = await getDiffSummary('/my-repo', { baseRef: 'main', targetRef: 'feature/auth' });
+ * ```
+ */
+export async function getDiffSummary(repoPath: string, options?: DiffOptions) {
+  const result = await getDiff(repoPath, options);
+  return result.files;
+}
+
+/**
+ * Retrieves diff for a single specific file.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param filePath - Path to file relative to repo root.
+ * @param options - Staged or base ref options.
+ * @returns Raw diff patch string for the single file.
+ *
+ * @example
+ * ```typescript
+ * const fileDiff = await getFileDiff('/my-repo', 'src/index.ts', { staged: true });
+ * ```
  */
 export async function getFileDiff(
   repoPath: string,
@@ -69,6 +106,16 @@ export async function getFileDiff(
 
 /**
  * Shows the contents of a file at a specific commit, branch, or tag reference (`git show <ref>:<filePath>`).
+ *
+ * @param repoPath - Repository root directory path.
+ * @param filePath - File path relative to repo root.
+ * @param ref - Git ref (commit hash, branch, or tag). Defaults to 'HEAD'.
+ * @returns Content string of the file at the specified historical ref.
+ *
+ * @example
+ * ```typescript
+ * const historicalContent = await getShowFile('/my-repo', 'src/auth.ts', 'v1.0.0');
+ * ```
  */
 export async function getShowFile(repoPath: string, filePath: string, ref = 'HEAD'): Promise<string> {
   return withGitErrorHandling('getShowFile', repoPath, async (client) => {
@@ -78,6 +125,16 @@ export async function getShowFile(repoPath: string, filePath: string, ref = 'HEA
 
 /**
  * Returns a list of filenames changed between two branches (`git diff --name-only baseBranch..targetBranch`).
+ *
+ * @param repoPath - Repository root directory path.
+ * @param baseBranch - Base comparison branch.
+ * @param targetBranch - Target comparison branch.
+ * @returns Array of changed file paths.
+ *
+ * @example
+ * ```typescript
+ * const files = await getChangedFilesBetweenBranches('/my-repo', 'main', 'feature/auth');
+ * ```
  */
 export async function getChangedFilesBetweenBranches(
   repoPath: string,

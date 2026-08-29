@@ -1,5 +1,3 @@
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import type {
   PullRequest,
   PullRequestFilter,
@@ -17,30 +15,25 @@ import { getDiff } from './diff.js';
 import { getCommitLog } from './commits.js';
 import { listBranches } from './branches.js';
 import { devInfo } from '../core/dev-mode/index.js';
-
-function getPrStorePath(repoPath: string): string {
-  return path.join(path.resolve(repoPath), '.hurdler', 'git', 'prs.json');
-}
-
-async function loadPullRequests(repoPath: string): Promise<PullRequest[]> {
-  const storePath = getPrStorePath(repoPath);
-  try {
-    const raw = await fs.readFile(storePath, 'utf-8');
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
-  } catch {
-    return [];
-  }
-}
-
-async function savePullRequests(repoPath: string, prs: PullRequest[]): Promise<void> {
-  const storePath = getPrStorePath(repoPath);
-  await fs.mkdir(path.dirname(storePath), { recursive: true });
-  await fs.writeFile(storePath, JSON.stringify(prs, null, 2), 'utf-8');
-}
+import { loadPullRequestsFromDisk, savePullRequestsToDisk } from './storage.js';
 
 /**
- * Creates a new Pull Request.
+ * Creates a new local Pull Request within the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Pull request creation parameters.
+ * @returns The newly created and saved PullRequest.
+ * @throws GitValidationError if source/target branch does not exist.
+ *
+ * @example
+ * ```typescript
+ * const pr = await createPullRequest('/my-repo', {
+ *   title: 'Implement user auth service',
+ *   sourceBranch: 'feature/auth',
+ *   targetBranch: 'main',
+ *   agentId: 'business-logic',
+ * });
+ * ```
  */
 export async function createPullRequest(
   repoPath: string,
@@ -63,7 +56,7 @@ export async function createPullRequest(
     throw new GitValidationError(`Target branch '${targetBranch}' does not exist.`);
   }
 
-  const existingPrs = await loadPullRequests(repoPath);
+  const existingPrs = await loadPullRequestsFromDisk(repoPath);
   const nextId = `pr-${existingPrs.length + 1}`;
   const now = new Date().toISOString();
   const author = options.author ?? getAgentAuthor(options.agentId);
@@ -83,20 +76,29 @@ export async function createPullRequest(
   });
 
   existingPrs.push(newPr);
-  await savePullRequests(repoPath, existingPrs);
+  await savePullRequestsToDisk(repoPath, existingPrs);
 
   devInfo('GIT_PR', `Created Pull Request #${newPr.id}: "${newPr.title}" (${newPr.sourceBranch} -> ${newPr.targetBranch})`);
   return newPr;
 }
 
 /**
- * Lists Pull Requests with optional filtering.
+ * Lists Pull Requests in the repository with optional filtering.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param filter - Optional filter parameters (status, sourceBranch, targetBranch, agentId, author).
+ * @returns Filtered array of PullRequest items.
+ *
+ * @example
+ * ```typescript
+ * const openPrs = await listPullRequests('/my-repo', { status: 'open' });
+ * ```
  */
 export async function listPullRequests(
   repoPath: string,
   filter?: PullRequestFilter
 ): Promise<PullRequest[]> {
-  const prs = await loadPullRequests(repoPath);
+  const prs = await loadPullRequestsFromDisk(repoPath);
 
   return prs.filter((pr) => {
     if (filter?.status && pr.status !== filter.status) {
@@ -124,12 +126,23 @@ export async function listPullRequests(
 
 /**
  * Retrieves a Pull Request by ID with its commit list and diff summary.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param prId - The PR identifier (e.g. 'pr-1').
+ * @returns PullRequest object with populated commits and diffSummary.
+ * @throws GitPRNotFoundError if the PR ID does not exist.
+ *
+ * @example
+ * ```typescript
+ * const prDetails = await getPullRequest('/my-repo', 'pr-1');
+ * console.log(prDetails.commits.length, prDetails.diffSummary.files.length);
+ * ```
  */
 export async function getPullRequest(
   repoPath: string,
   prId: string
 ): Promise<PullRequest & { commits: CommitLogEntry[]; diffSummary: DiffResult }> {
-  const prs = await loadPullRequests(repoPath);
+  const prs = await loadPullRequestsFromDisk(repoPath);
   const pr = prs.find((p) => p.id === prId);
 
   if (!pr) {
@@ -160,7 +173,63 @@ export async function getPullRequest(
 }
 
 /**
+ * Updates a Pull Request's metadata (title, description, targetBranch).
+ *
+ * @param repoPath - Repository root directory path.
+ * @param prId - The PR identifier.
+ * @param updates - Properties to update.
+ * @returns Updated PullRequest object.
+ * @throws GitPRNotFoundError if PR not found.
+ *
+ * @example
+ * ```typescript
+ * const updated = await updatePullRequest('/my-repo', 'pr-1', { title: 'Updated PR Title' });
+ * ```
+ */
+export async function updatePullRequest(
+  repoPath: string,
+  prId: string,
+  updates: Partial<Pick<PullRequest, 'title' | 'description' | 'targetBranch'>>
+): Promise<PullRequest> {
+  const prs = await loadPullRequestsFromDisk(repoPath);
+  const prIndex = prs.findIndex((p) => p.id === prId);
+
+  if (prIndex === -1) {
+    throw new GitPRNotFoundError(prId, { repoPath });
+  }
+
+  const pr = prs[prIndex];
+  const now = new Date().toISOString();
+
+  if (updates.title !== undefined) pr.title = updates.title;
+  if (updates.description !== undefined) pr.description = updates.description;
+  if (updates.targetBranch !== undefined) pr.targetBranch = updates.targetBranch;
+  pr.updatedAt = now;
+
+  prs[prIndex] = pr;
+  await savePullRequestsToDisk(repoPath, prs);
+
+  devInfo('GIT_PR', `Updated Pull Request #${prId}`);
+  return pr;
+}
+
+/**
  * Submits a review on a Pull Request.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param prId - The PR identifier.
+ * @param review - The review details.
+ * @returns Updated PullRequest object.
+ * @throws GitPRNotFoundError if PR not found.
+ *
+ * @example
+ * ```typescript
+ * await reviewPullRequest('/my-repo', 'pr-1', {
+ *   agentId: 'security-reviewer',
+ *   status: 'approved',
+ *   comment: 'Security review passed.',
+ * });
+ * ```
  */
 export async function reviewPullRequest(
   repoPath: string,
@@ -172,7 +241,7 @@ export async function reviewPullRequest(
     comment: string;
   }
 ): Promise<PullRequest> {
-  const prs = await loadPullRequests(repoPath);
+  const prs = await loadPullRequestsFromDisk(repoPath);
   const prIndex = prs.findIndex((p) => p.id === prId);
 
   if (prIndex === -1) {
@@ -201,7 +270,7 @@ export async function reviewPullRequest(
   }
 
   prs[prIndex] = pr;
-  await savePullRequests(repoPath, prs);
+  await savePullRequestsToDisk(repoPath, prs);
 
   devInfo('GIT_PR', `Added review [${review.status}] to PR #${prId} by ${reviewerAuthor.name}`);
   return pr;
@@ -209,6 +278,18 @@ export async function reviewPullRequest(
 
 /**
  * Merges a Pull Request and updates its status to 'merged'.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param prId - The PR identifier.
+ * @param options - Merge method and author options.
+ * @returns Object with merged PullRequest and Git MergeResult.
+ * @throws GitPRNotFoundError if PR not found.
+ * @throws GitValidationError if PR is already merged or closed.
+ *
+ * @example
+ * ```typescript
+ * const { pr, mergeResult } = await mergePullRequest('/my-repo', 'pr-1', { mergeMethod: 'no-ff' });
+ * ```
  */
 export async function mergePullRequest(
   repoPath: string,
@@ -219,7 +300,7 @@ export async function mergePullRequest(
     agentId?: string;
   }
 ): Promise<{ pr: PullRequest; mergeResult: MergeResult }> {
-  const prs = await loadPullRequests(repoPath);
+  const prs = await loadPullRequestsFromDisk(repoPath);
   const prIndex = prs.findIndex((p) => p.id === prId);
 
   if (prIndex === -1) {
@@ -258,7 +339,7 @@ export async function mergePullRequest(
   pr.updatedAt = now;
 
   prs[prIndex] = pr;
-  await savePullRequests(repoPath, prs);
+  await savePullRequestsToDisk(repoPath, prs);
 
   devInfo('GIT_PR', `Merged PR #${pr.id} into '${pr.targetBranch}' successfully.`);
   return { pr, mergeResult };
@@ -266,13 +347,24 @@ export async function mergePullRequest(
 
 /**
  * Closes a Pull Request without merging.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param prId - The PR identifier.
+ * @param reason - Optional explanation for closing.
+ * @returns Closed PullRequest object.
+ * @throws GitPRNotFoundError if PR not found.
+ *
+ * @example
+ * ```typescript
+ * const closed = await closePullRequest('/my-repo', 'pr-1', 'Superceded by pr-2');
+ * ```
  */
 export async function closePullRequest(
   repoPath: string,
   prId: string,
   reason?: string
 ): Promise<PullRequest> {
-  const prs = await loadPullRequests(repoPath);
+  const prs = await loadPullRequestsFromDisk(repoPath);
   const prIndex = prs.findIndex((p) => p.id === prId);
 
   if (prIndex === -1) {
@@ -287,8 +379,83 @@ export async function closePullRequest(
   pr.updatedAt = now;
 
   prs[prIndex] = pr;
-  await savePullRequests(repoPath, prs);
+  await savePullRequestsToDisk(repoPath, prs);
 
   devInfo('GIT_PR', `Closed PR #${pr.id}: ${reason ?? '(no reason given)'}`);
   return pr;
+}
+
+/**
+ * Reopens a closed Pull Request.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param prId - The PR identifier.
+ * @returns Reopened PullRequest object.
+ * @throws GitPRNotFoundError if PR not found.
+ * @throws GitValidationError if PR is already merged or open.
+ *
+ * @example
+ * ```typescript
+ * const reopened = await reopenPullRequest('/my-repo', 'pr-1');
+ * ```
+ */
+export async function reopenPullRequest(
+  repoPath: string,
+  prId: string
+): Promise<PullRequest> {
+  const prs = await loadPullRequestsFromDisk(repoPath);
+  const prIndex = prs.findIndex((p) => p.id === prId);
+
+  if (prIndex === -1) {
+    throw new GitPRNotFoundError(prId, { repoPath });
+  }
+
+  const pr = prs[prIndex];
+  if (pr.status === 'merged') {
+    throw new GitValidationError(`Cannot reopen merged Pull Request #${prId}.`);
+  }
+  if (pr.status === 'open') {
+    throw new GitValidationError(`Pull Request #${prId} is already open.`);
+  }
+
+  const now = new Date().toISOString();
+  pr.status = 'open';
+  pr.closeReason = undefined;
+  pr.updatedAt = now;
+
+  prs[prIndex] = pr;
+  await savePullRequestsToDisk(repoPath, prs);
+
+  devInfo('GIT_PR', `Reopened PR #${pr.id}`);
+  return pr;
+}
+
+/**
+ * Deletes a Pull Request permanently from local storage.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param prId - The PR identifier.
+ * @returns True if deleted, false if not found.
+ *
+ * @example
+ * ```typescript
+ * const deleted = await deletePullRequest('/my-repo', 'pr-1');
+ * ```
+ */
+export async function deletePullRequest(
+  repoPath: string,
+  prId: string
+): Promise<boolean> {
+  const prs = await loadPullRequestsFromDisk(repoPath);
+  const prIndex = prs.findIndex((p) => p.id === prId);
+
+  if (prIndex === -1) {
+    return false;
+  }
+
+  prs.splice(prIndex, 1);
+  await savePullRequestsToDisk(repoPath, prs);
+
+  devInfo('GIT_PR', `Deleted PR #${prId}`);
+  return true;
 }

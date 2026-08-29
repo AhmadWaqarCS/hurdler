@@ -20,13 +20,19 @@ export const DEFAULT_MODULES_REGISTRY_PATH = '.hurdler/registries/modules.json';
  * @param customPath - Optional custom relative or absolute path.
  * @param projectRoot - Base directory (defaults to process.cwd()).
  * @returns Fully-resolved absolute path.
+ *
+ * @example
+ * ```typescript
+ * const path = resolveModuleRegistryPath();
+ * // '/home/user/project/.hurdler/registries/modules.json'
+ * ```
  */
 export function resolveModuleRegistryPath(
   customPath?: string,
   projectRoot = process.cwd()
 ): string {
   if (customPath) {
-    return path.isAbsolute(customPath) ? customPath : path.resolve(projectRoot, customPath);
+    return path.isAbsolute(customPath) ? path.normalize(customPath) : path.resolve(projectRoot, customPath);
   }
   return path.resolve(projectRoot, DEFAULT_MODULES_REGISTRY_PATH);
 }
@@ -37,6 +43,11 @@ export function resolveModuleRegistryPath(
  * @param customPath - Optional custom path override.
  * @param projectRoot - Optional project root directory.
  * @returns Promise resolving to true if file exists and is accessible.
+ *
+ * @example
+ * ```typescript
+ * const exists = await isModuleRegistryFilePresent();
+ * ```
  */
 export async function isModuleRegistryFilePresent(
   customPath?: string,
@@ -53,10 +64,17 @@ export async function isModuleRegistryFilePresent(
 
 /**
  * Persists module definitions and bundles to disk in `.hurdler/registries/modules.json`.
+ * Writes atomically via temporary file replacement.
  *
  * @param modules - Map or array of ModuleDefinition items.
  * @param bundles - Optional map or array of ModuleBundle items.
  * @param options - Optional path overrides.
+ * @throws ModuleStorageError if writing or validation fails.
+ *
+ * @example
+ * ```typescript
+ * await saveModuleRegistryToDisk(modules, bundles);
+ * ```
  */
 export async function saveModuleRegistryToDisk(
   modules: Record<string, ModuleDefinition> | ModuleDefinition[],
@@ -120,6 +138,12 @@ export async function saveModuleRegistryToDisk(
  *
  * @param options - Optional path overrides.
  * @returns Validated persisted module registry, or null if file not found.
+ * @throws ModuleStorageError if reading or validation fails.
+ *
+ * @example
+ * ```typescript
+ * const registry = await loadModuleRegistryFromDisk();
+ * ```
  */
 export async function loadModuleRegistryFromDisk(options?: {
   targetPath?: string;
@@ -154,6 +178,11 @@ export async function loadModuleRegistryFromDisk(options?: {
  *
  * @param options - Optional path overrides.
  * @returns Merged PersistedModuleRegistry.
+ *
+ * @example
+ * ```typescript
+ * const merged = await syncModuleRegistryWithDisk();
+ * ```
  */
 export async function syncModuleRegistryWithDisk(options?: {
   targetPath?: string;

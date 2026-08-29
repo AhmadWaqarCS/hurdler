@@ -10,6 +10,15 @@ export const GitAuthorSchema = z.object({
 });
 
 /**
+ * Persisted Git Authors schema for `.hurdler/git/authors.json`.
+ */
+export const PersistedGitAuthorsSchema = z.object({
+  version: z.string().default('1.0.0'),
+  updatedAt: z.string(),
+  authors: z.record(z.string(), GitAuthorSchema),
+});
+
+/**
  * Git reference (branch, tag) name validation.
  * Enforces standard git ref rules (disallows spaces, ~^:?*[\, .., leading/trailing slashes, .lock).
  */
@@ -250,6 +259,17 @@ export const PullRequestFilterSchema = z.object({
 });
 
 /**
+ * Issue comment schema.
+ */
+export const IssueCommentSchema = z.object({
+  id: z.string().min(1),
+  author: GitAuthorSchema,
+  agentId: z.string().optional(),
+  comment: z.string().min(1, 'Comment cannot be empty'),
+  createdAt: z.string(),
+});
+
+/**
  * Git Issue schema.
  */
 export const GitIssueSchema = z.object({
@@ -265,6 +285,7 @@ export const GitIssueSchema = z.object({
   updatedAt: z.string(),
   closedAt: z.string().optional(),
   closeReason: z.string().optional(),
+  comments: z.array(IssueCommentSchema).default([]),
 });
 
 /**
@@ -287,4 +308,70 @@ export const InitRepoOptionsSchema = z.object({
   author: GitAuthorSchema.optional(),
   agentId: z.string().optional(),
   gitignoreEntries: z.array(z.string()).optional(),
+});
+
+/**
+ * Git Configuration schema.
+ */
+export const GitConfigSchema = z.object({
+  defaultBranch: GitRefNameSchema.default('main'),
+  autoStage: z.boolean().default(false),
+  defaultCommitPrefix: z.string().default('chore:'),
+  requireLinearHistory: z.boolean().default(false),
+  defaultRemote: z.string().default('origin'),
+  authorFallbackAgentId: z.string().default('orchestrator'),
+  gitignoreDefaults: z
+    .array(z.string())
+    .default([
+      'node_modules/',
+      'dist/',
+      '.env',
+      '.env.*',
+      '!.env.example',
+      '*.log',
+      '.DS_Store',
+      'coverage/',
+      '.hurdler/cache/',
+    ]),
+});
+
+/**
+ * Persisted Git Config schema for `.hurdler/git/config.json`.
+ */
+export const PersistedGitConfigSchema = z.object({
+  version: z.string().default('1.0.0'),
+  updatedAt: z.string(),
+  config: GitConfigSchema,
+});
+
+/**
+ * Revert options schema.
+ */
+export const RevertOptionsSchema = z.object({
+  commitHash: z.string().min(1, 'Commit hash is required'),
+  noCommit: z.boolean().default(false),
+  message: z.string().optional(),
+  author: GitAuthorSchema.optional(),
+  agentId: z.string().optional(),
+});
+
+/**
+ * Cherry pick options schema.
+ */
+export const CherryPickOptionsSchema = z.object({
+  commitHash: z.string().min(1, 'Commit hash is required'),
+  noCommit: z.boolean().default(false),
+  author: GitAuthorSchema.optional(),
+  agentId: z.string().optional(),
+});
+
+/**
+ * Amend options schema.
+ */
+export const AmendOptionsSchema = z.object({
+  message: z.string().optional(),
+  files: z.array(z.string()).optional(),
+  author: GitAuthorSchema.optional(),
+  agentId: z.string().optional(),
+  noEdit: z.boolean().default(false),
 });

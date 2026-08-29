@@ -8,29 +8,53 @@ import type {
 
 /**
  * Resolves the version string based on the chosen version strategy.
+ *
+ * @param module - The module definition.
+ * @param strategy - Semver strategy to resolve ('exact', 'caret', 'tilde', 'latest_stable').
+ * @returns Resolved version string specifier.
+ *
+ * @example
+ * ```typescript
+ * const v = resolveTargetVersion(zodModule, 'caret');
+ * // '^3.23.8'
+ * ```
  */
 export function resolveTargetVersion(
   module: ModuleDefinition,
   strategy: VersionStrategy = 'exact'
 ): string {
+  if (!module) return 'latest';
+  const pinned = module.pinnedVersion || 'latest';
+  const recommended = module.recommendedVersion || `^${pinned}`;
+
   switch (strategy) {
     case 'exact':
-      return module.pinnedVersion;
+      return pinned;
     case 'caret':
-      return module.recommendedVersion.startsWith('^')
-        ? module.recommendedVersion
-        : `^${module.pinnedVersion}`;
+      return recommended.startsWith('^') ? recommended : `^${pinned}`;
     case 'tilde':
-      return `~${module.pinnedVersion}`;
+      return `~${pinned}`;
     case 'latest_stable':
-      return module.pinnedVersion;
+      return pinned;
     default:
-      return module.pinnedVersion;
+      return pinned;
   }
 }
 
 /**
  * Generates formatted CLI installation commands (split by runtime vs devDependency).
+ *
+ * @param modules - List of modules to install.
+ * @param packageManager - Target package manager ('npm', 'pnpm', 'yarn', 'bun').
+ * @param strategy - Version strategy.
+ * @returns Object with command strings and package lists.
+ *
+ * @example
+ * ```typescript
+ * const cmd = formatInstallCommands([zod, prisma], 'pnpm', 'exact');
+ * console.log(cmd.combinedCmd);
+ * // 'pnpm add zod@3.23.8 && pnpm add -D prisma@5.22.0'
+ * ```
  */
 export function formatInstallCommands(
   modules: ModuleDefinition[],
@@ -47,6 +71,7 @@ export function formatInstallCommands(
   const devPackages: string[] = [];
 
   for (const mod of modules) {
+    if (!mod || typeof mod !== 'object') continue;
     const version = resolveTargetVersion(mod, strategy);
     const specifier = `${mod.name}@${version}`;
     if (mod.isDevDependency) {
@@ -92,6 +117,15 @@ export function formatInstallCommands(
 
 /**
  * Generates a clean JSON-ready dependency dictionary for package.json.
+ *
+ * @param modules - List of modules.
+ * @param options - Version strategy options.
+ * @returns Dependencies and devDependencies maps.
+ *
+ * @example
+ * ```typescript
+ * const deps = formatPackageJsonDependencies([zod, next]);
+ * ```
  */
 export function formatPackageJsonDependencies(
   modules: ModuleDefinition[],
@@ -102,6 +136,7 @@ export function formatPackageJsonDependencies(
   const devDependencies: Record<string, string> = {};
 
   for (const mod of modules) {
+    if (!mod || typeof mod !== 'object') continue;
     const version = resolveTargetVersion(mod, strategy);
     if (mod.isDevDependency) {
       devDependencies[mod.name] = version;
@@ -115,6 +150,15 @@ export function formatPackageJsonDependencies(
 
 /**
  * Formats a formatted package.json snippet with dependencies.
+ *
+ * @param modules - List of modules.
+ * @param options - Version strategy options.
+ * @returns Pretty-printed JSON string snippet.
+ *
+ * @example
+ * ```typescript
+ * const snippet = formatPackageJsonDependenciesSnippet([zod, prisma]);
+ * ```
  */
 export function formatPackageJsonDependenciesSnippet(
   modules: ModuleDefinition[],
@@ -130,6 +174,9 @@ export function formatPackageJsonDependenciesSnippet(
 
 /**
  * Formats a single module as a concise one-line reference.
+ *
+ * @param module - Module definition.
+ * @returns Markdown bullet point reference.
  */
 export function formatModuleQuickReference(module: ModuleDefinition): string {
   return `- **${module.name}** (\`${module.pinnedVersion}\`): ${module.description} — [Docs](${module.docUrl})`;
@@ -137,6 +184,10 @@ export function formatModuleQuickReference(module: ModuleDefinition): string {
 
 /**
  * Formats detailed documentation, rules, and examples for a single module.
+ *
+ * @param module - Module definition.
+ * @param options - Prompt formatting options.
+ * @returns Detailed markdown string.
  */
 export function formatModuleDetails(
   module: ModuleDefinition,
@@ -204,6 +255,9 @@ export function formatModuleDetails(
 
 /**
  * Extracts and aggregates all anti-patterns and best practices into an actionable rule list for code generation prompts.
+ *
+ * @param modules - List of modules.
+ * @returns Aggregated guidelines markdown string.
  */
 export function formatModuleRules(modules: ModuleDefinition[]): string {
   const practices: string[] = [];
@@ -235,6 +289,15 @@ export function formatModuleRules(modules: ModuleDefinition[]): string {
 
 /**
  * Formats a collection of modules into high-signal markdown context specifically designed for LLMs.
+ *
+ * @param modules - List of modules.
+ * @param options - Prompt formatting configuration.
+ * @returns Formatted prompt markdown block.
+ *
+ * @example
+ * ```typescript
+ * const prompt = formatModulesForLLM([zod, prisma], { detailLevel: 'full' });
+ * ```
  */
 export function formatModulesForLLM(
   modules: ModuleDefinition[],

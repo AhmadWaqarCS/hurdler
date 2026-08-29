@@ -9,6 +9,14 @@ import { GitRepositoryNotFoundError } from './errors.js';
 
 /**
  * Checks if a given path is inside or points to a valid Git repository.
+ *
+ * @param targetPath - Path to verify.
+ * @returns Promise resolving to true if directory is a Git repository.
+ *
+ * @example
+ * ```typescript
+ * const isRepo = await isGitRepository('/my-project');
+ * ```
  */
 export async function isGitRepository(targetPath: string): Promise<boolean> {
   try {
@@ -21,6 +29,15 @@ export async function isGitRepository(targetPath: string): Promise<boolean> {
 
 /**
  * Resolves the root directory of the Git repository for a given target path.
+ *
+ * @param targetPath - Path to resolve root from.
+ * @returns The absolute path to top-level repository directory.
+ * @throws GitRepositoryNotFoundError if targetPath is not in a git repo.
+ *
+ * @example
+ * ```typescript
+ * const root = await getGitRoot('/my-project/src/sub');
+ * ```
  */
 export async function getGitRoot(targetPath: string): Promise<string> {
   return withGitErrorHandling('getGitRoot', targetPath, async (client) => {
@@ -35,6 +52,18 @@ export async function getGitRoot(targetPath: string): Promise<string> {
 
 /**
  * Initializes a new Git repository at the specified path.
+ *
+ * @param repoPath - Repository directory to create and initialize.
+ * @param options - Default branch, initial commit, gitignore entries, and author options.
+ *
+ * @example
+ * ```typescript
+ * await initRepository('/my-new-project', {
+ *   defaultBranch: 'main',
+ *   initialCommit: true,
+ *   agentId: 'system',
+ * });
+ * ```
  */
 export async function initRepository(repoPath: string, options?: InitRepoOptions): Promise<void> {
   const parsed = InitRepoOptionsSchema.parse(options ?? {});
@@ -61,6 +90,7 @@ export async function initRepository(repoPath: string, options?: InitRepoOptions
         '*.log',
         '.DS_Store',
         'coverage/',
+        '.hurdler/cache/',
       ];
       await fs.writeFile(gitignorePath, defaultEntries.join('\n') + '\n', 'utf-8');
       gitignoreCreated = true;
@@ -83,6 +113,15 @@ export async function initRepository(repoPath: string, options?: InitRepoOptions
 
 /**
  * Retrieves rich structured status of the working tree.
+ *
+ * @param repoPath - Repository root directory path.
+ * @returns GitStatusResult containing branch, staged/modified/untracked files, ahead/behind counts.
+ *
+ * @example
+ * ```typescript
+ * const status = await getGitStatus('/my-repo');
+ * console.log(status.isClean, status.current, status.modified);
+ * ```
  */
 export async function getGitStatus(repoPath: string): Promise<GitStatusResult> {
   return withGitErrorHandling('getGitStatus', repoPath, async (client) => {

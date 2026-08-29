@@ -5,6 +5,15 @@ import { devInfo } from '../core/dev-mode/index.js';
 
 /**
  * Stages specific file paths or patterns.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param files - File path or array of file paths to stage.
+ * @returns Array of staged file paths.
+ *
+ * @example
+ * ```typescript
+ * await stageFiles('/my-repo', ['src/index.ts', 'src/auth.ts']);
+ * ```
  */
 export async function stageFiles(repoPath: string, files: string | string[]): Promise<string[]> {
   const fileList = parseCommaSeparatedList(files);
@@ -21,6 +30,13 @@ export async function stageFiles(repoPath: string, files: string | string[]): Pr
 
 /**
  * Stages all modified, created, and deleted files in the working directory (`git add -A`).
+ *
+ * @param repoPath - Repository root directory path.
+ *
+ * @example
+ * ```typescript
+ * await stageAll('/my-repo');
+ * ```
  */
 export async function stageAll(repoPath: string): Promise<void> {
   return withGitErrorHandling('stageAll', repoPath, async (client) => {
@@ -31,6 +47,14 @@ export async function stageAll(repoPath: string): Promise<void> {
 
 /**
  * Unstages previously staged files (`git restore --staged <files>` or `git reset HEAD <files>`).
+ *
+ * @param repoPath - Repository root directory path.
+ * @param files - File path or array of file paths to unstage.
+ *
+ * @example
+ * ```typescript
+ * await unstageFiles('/my-repo', 'src/temp.ts');
+ * ```
  */
 export async function unstageFiles(repoPath: string, files: string | string[]): Promise<void> {
   const fileList = parseCommaSeparatedList(files);
@@ -45,7 +69,15 @@ export async function unstageFiles(repoPath: string, files: string | string[]): 
 }
 
 /**
- * Discards working directory changes.
+ * Discards working directory changes for tracked files, and optionally removes untracked files.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Files to discard and untracked cleanup preference.
+ *
+ * @example
+ * ```typescript
+ * await discardChanges('/my-repo', { files: ['src/experiment.ts'], untracked: true });
+ * ```
  */
 export async function discardChanges(repoPath: string, options?: DiscardChangesOptions): Promise<void> {
   return withGitErrorHandling('discardChanges', repoPath, async (client) => {
@@ -68,6 +100,13 @@ export async function discardChanges(repoPath: string, options?: DiscardChangesO
 
 /**
  * Removes untracked files and directories from the working tree (`git clean -fd`).
+ *
+ * @param repoPath - Repository root directory path.
+ *
+ * @example
+ * ```typescript
+ * await cleanUntracked('/my-repo');
+ * ```
  */
 export async function cleanUntracked(repoPath: string): Promise<void> {
   return withGitErrorHandling('cleanUntracked', repoPath, async (client) => {

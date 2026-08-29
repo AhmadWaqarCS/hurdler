@@ -88,6 +88,29 @@ export const ModuleDefinitionSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+export const ModuleUpdateSchema = z.object({
+  displayName: z.string().min(1).optional(),
+  category: ModuleCategorySchema.optional(),
+  description: z.string().min(1).optional(),
+  docUrl: z.string().url().optional(),
+  repoUrl: z.string().url().optional(),
+  npmUrl: z.string().url().optional(),
+  recommendedVersion: z.string().min(1).optional(),
+  pinnedVersion: z.string().min(1).optional(),
+  minNodeVersion: z.string().optional(),
+  isDevDependency: z.boolean().optional(),
+  installCommands: InstallCommandsSchema.optional(),
+  runtime: z.array(RuntimeEnvironmentSchema).min(1).optional(),
+  packageType: PackageTypeSchema.optional(),
+  tags: z.array(z.string()).optional(),
+  peerDependencies: z.array(z.string()).optional(),
+  recommendedCompanions: z.array(z.string()).optional(),
+  bestPractices: z.array(z.string()).optional(),
+  antiPatterns: z.array(z.string()).optional(),
+  exampleUsage: z.string().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const ModuleBundleSchema = z.object({
   id: z.string().min(1, 'Bundle ID must not be empty'),
   name: z.string().min(1, 'Bundle name must not be empty'),
@@ -98,12 +121,28 @@ export const ModuleBundleSchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
+export const BundleUpdateSchema = z.object({
+  name: z.string().min(1).optional(),
+  description: z.string().min(1).optional(),
+  modules: z.array(z.string()).min(1).optional(),
+  devModules: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
+
 export const ModuleFilterOptionsSchema = z.object({
   names: z.array(z.string()).optional(),
   categories: z.array(ModuleCategorySchema).optional(),
   tags: z.array(z.string()).optional(),
   runtime: RuntimeEnvironmentSchema.optional(),
   isDevDependency: z.boolean().optional(),
+  search: z.string().optional(),
+});
+
+export const BundleFilterOptionsSchema = z.object({
+  ids: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional(),
+  includesModule: z.string().optional(),
   search: z.string().optional(),
 });
 
@@ -130,4 +169,3 @@ export const PersistedModuleRegistrySchema = z.object({
   modules: ModuleRegistryMapSchema.default({}),
   bundles: ModuleBundleRegistryMapSchema.default({}),
 });
-

@@ -3,10 +3,25 @@ import type { MergeOptions, MergeResult, GitAuthor } from './types.js';
 import { MergeOptionsSchema } from './schema.js';
 import { getAgentAuthor, formatAuthorArg } from './authors.js';
 import { devInfo, devWarn } from '../core/dev-mode/index.js';
-import { GitConflictError } from './errors.js';
+import { GitConflictError, GitValidationError } from './errors.js';
 
 /**
  * Merges a source branch into the target branch (or current active branch).
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Merge options (sourceBranch, targetBranch, author, agentId, fastForwardOnly, noFf, squash, message).
+ * @returns Structured MergeResult indicating success, merged commit hash, or conflict list.
+ *
+ * @example
+ * ```typescript
+ * const result = await mergeBranch('/my-repo', {
+ *   sourceBranch: 'feature/auth',
+ *   targetBranch: 'main',
+ *   noFf: true,
+ *   agentId: 'orchestrator',
+ * });
+ * console.log(result.success, result.mergedCommitHash);
+ * ```
  */
 export async function mergeBranch(repoPath: string, options: MergeOptions): Promise<MergeResult> {
   const parsed = MergeOptionsSchema.parse(options);
@@ -89,6 +104,13 @@ export async function mergeBranch(repoPath: string, options: MergeOptions): Prom
 
 /**
  * Aborts an in-progress merge with conflicts (`git merge --abort`).
+ *
+ * @param repoPath - Repository root directory path.
+ *
+ * @example
+ * ```typescript
+ * await abortMerge('/my-repo');
+ * ```
  */
 export async function abortMerge(repoPath: string): Promise<void> {
   return withGitErrorHandling('abortMerge', repoPath, async (client) => {
@@ -99,10 +121,40 @@ export async function abortMerge(repoPath: string): Promise<void> {
 
 /**
  * Retrieves the list of currently conflicted files in the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @returns Array of conflicted file paths.
+ *
+ * @example
+ * ```typescript
+ * const conflicts = await getConflictFiles('/my-repo');
+ * ```
  */
 export async function getConflictFiles(repoPath: string): Promise<string[]> {
   return withGitErrorHandling('getConflictFiles', repoPath, async (client) => {
     const status = await client.status();
     return status.conflicted;
+  });
+}
+
+/**
+ * Marks a conflicted file as resolved by staging it.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param filePath - Path to the resolved file.
+ *
+ * @example
+ * ```typescript
+ * await resolveConflictFile('/my-repo', 'src/auth.ts');
+ * ```
+ */
+export async function resolveConflictFile(repoPath: string, filePath: string): Promise<void> {
+  if (!filePath || !filePath.trim()) {
+    throw new GitValidationError('File path to resolve conflict cannot be empty.');
+  }
+
+  return withGitErrorHandling('resolveConflictFile', repoPath, async (client) => {
+    await client.add(filePath.trim());
+    devInfo('GIT_MERGE', `Marked conflict resolved for file: ${filePath}`);
   });
 }

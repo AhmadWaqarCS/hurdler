@@ -65,6 +65,18 @@ export class GitConflictError extends GitError {
 }
 
 /**
+ * Thrown when a Git merge fails due to non-conflict issues (e.g. fast-forward impossible).
+ */
+export class GitMergeError extends GitError {
+  constructor(message: string, options: GitErrorOptions = {}) {
+    super(`Git merge failed: ${message}`, {
+      ...options,
+      code: 'GIT_MERGE_ERROR',
+    });
+  }
+}
+
+/**
  * Thrown when a specified Git branch does not exist.
  */
 export class GitBranchNotFoundError extends GitError {
@@ -161,5 +173,83 @@ export class GitIssueNotFoundError extends GitError {
       details: { ...options.details, issueId },
     });
     this.issueId = issueId;
+  }
+}
+
+/**
+ * Thrown when a Git tag is not found.
+ */
+export class GitTagNotFoundError extends GitError {
+  readonly tagName: string;
+
+  constructor(tagName: string, options: GitErrorOptions = {}) {
+    super(`Git tag '${tagName}' was not found.`, {
+      ...options,
+      code: 'GIT_TAG_NOT_FOUND',
+      details: { ...options.details, tagName },
+    });
+    this.tagName = tagName;
+  }
+}
+
+/**
+ * Thrown when a Git remote is not found.
+ */
+export class GitRemoteNotFoundError extends GitError {
+  readonly remoteName: string;
+
+  constructor(remoteName: string, options: GitErrorOptions = {}) {
+    super(`Git remote '${remoteName}' was not found.`, {
+      ...options,
+      code: 'GIT_REMOTE_NOT_FOUND',
+      details: { ...options.details, remoteName },
+    });
+    this.remoteName = remoteName;
+  }
+}
+
+/**
+ * Thrown when a Git stash index is not found.
+ */
+export class GitStashNotFoundError extends GitError {
+  readonly stashIndex: number;
+
+  constructor(stashIndex: number, options: GitErrorOptions = {}) {
+    super(`Git stash at index '${stashIndex}' was not found.`, {
+      ...options,
+      code: 'GIT_STASH_NOT_FOUND',
+      details: { ...options.details, stashIndex },
+    });
+    this.stashIndex = stashIndex;
+  }
+}
+
+/**
+ * Thrown when Git configuration read or write fails.
+ */
+export class GitConfigError extends GitError {
+  constructor(message: string, options: GitErrorOptions = {}) {
+    super(`Git configuration error: ${message}`, {
+      ...options,
+      code: 'GIT_CONFIG_ERROR',
+    });
+  }
+}
+
+/**
+ * Thrown when reading or writing Git persistent metadata in `.hurdler/git/` fails.
+ */
+export class GitStorageError extends GitError {
+  readonly filePath: string;
+  readonly operation: 'read' | 'write' | 'delete';
+
+  constructor(filePath: string, operation: 'read' | 'write' | 'delete', reason: string, cause?: unknown) {
+    super(`Failed to ${operation} Git store at '${filePath}': ${reason}`, {
+      cause,
+      code: 'GIT_STORAGE_ERROR',
+      details: { filePath, operation, reason },
+    });
+    this.filePath = filePath;
+    this.operation = operation;
   }
 }

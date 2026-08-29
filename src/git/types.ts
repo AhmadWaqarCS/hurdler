@@ -19,7 +19,14 @@ import type {
   PullRequestFilterSchema,
   GitIssueSchema,
   GitIssueFilterSchema,
+  IssueCommentSchema,
   InitRepoOptionsSchema,
+  GitConfigSchema,
+  PersistedGitAuthorsSchema,
+  PersistedGitConfigSchema,
+  RevertOptionsSchema,
+  CherryPickOptionsSchema,
+  AmendOptionsSchema,
 } from './schema.js';
 
 export type GitAuthor = z.infer<typeof GitAuthorSchema>;
@@ -41,8 +48,15 @@ export type PullRequest = z.infer<typeof PullRequestSchema>;
 export type PullRequestFilter = z.input<typeof PullRequestFilterSchema>;
 export type GitIssue = z.infer<typeof GitIssueSchema>;
 export type GitIssueFilter = z.input<typeof GitIssueFilterSchema>;
+export type IssueComment = z.infer<typeof IssueCommentSchema>;
 export type InitRepoOptions = z.input<typeof InitRepoOptionsSchema>;
-
+export type GitConfig = z.infer<typeof GitConfigSchema>;
+export type GitConfigInput = z.input<typeof GitConfigSchema>;
+export type PersistedGitAuthors = z.infer<typeof PersistedGitAuthorsSchema>;
+export type PersistedGitConfig = z.infer<typeof PersistedGitConfigSchema>;
+export type RevertOptions = z.input<typeof RevertOptionsSchema>;
+export type CherryPickOptions = z.input<typeof CherryPickOptionsSchema>;
+export type AmendOptions = z.input<typeof AmendOptionsSchema>;
 
 /**
  * Options for creating a new branch.
@@ -98,4 +112,36 @@ export interface GitLogOptions {
 export interface CommitDetails extends CommitLogEntry {
   diff?: string;
   files: string[];
+}
+
+/**
+ * Detailed information for a single branch.
+ */
+export interface BranchDetails {
+  name: string;
+  current: boolean;
+  commit: string;
+  label: string;
+  ahead?: number;
+  behind?: number;
+  upstream?: string;
+}
+
+/**
+ * Detailed information for a Git tag.
+ */
+export interface TagDetails {
+  name: string;
+  commit: string;
+  message?: string;
+  tagger?: GitAuthor;
+  date?: string;
+}
+
+/**
+ * Detailed information for a Stash item.
+ */
+export interface StashDetails extends StashEntry {
+  changedFiles?: string[];
+  diff?: string;
 }

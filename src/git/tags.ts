@@ -1,11 +1,20 @@
 import { withGitErrorHandling } from './client.js';
-import type { TagOptions } from './types.js';
+import type { TagOptions, TagDetails } from './types.js';
 import { GitRefNameSchema } from './schema.js';
-import { GitValidationError } from './errors.js';
+import { GitValidationError, GitTagNotFoundError } from './errors.js';
 import { devInfo } from '../core/dev-mode/index.js';
 
 /**
  * Validates a Git tag name.
+ *
+ * @param name - The tag name string to validate.
+ * @returns The validated tag name.
+ * @throws GitValidationError if tag name format is invalid.
+ *
+ * @example
+ * ```typescript
+ * const valid = validateTagName('v1.0.0');
+ * ```
  */
 export function validateTagName(name: string): string {
   const parseResult = GitRefNameSchema.safeParse(name);
@@ -18,7 +27,16 @@ export function validateTagName(name: string): string {
 }
 
 /**
- * Creates a new Git tag.
+ * Creates a new Git tag (annotated or lightweight).
+ *
+ * @param repoPath - Repository root directory path.
+ * @param tagName - Name of the tag to create (e.g. 'v1.0.0').
+ * @param options - Tag message, ref, author, and annotation options.
+ *
+ * @example
+ * ```typescript
+ * await createTag('/my-repo', 'v1.0.0', { message: 'First stable release' });
+ * ```
  */
 export async function createTag(
   repoPath: string,
@@ -47,7 +65,15 @@ export async function createTag(
 }
 
 /**
- * Lists all tags in the repository.
+ * Lists all tag names in the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @returns Array of tag names.
+ *
+ * @example
+ * ```typescript
+ * const tags = await listTags('/my-repo');
+ * ```
  */
 export async function listTags(repoPath: string): Promise<string[]> {
   return withGitErrorHandling('listTags', repoPath, async (client) => {
@@ -57,7 +83,16 @@ export async function listTags(repoPath: string): Promise<string[]> {
 }
 
 /**
- * Checks if a tag exists.
+ * Checks if a specific tag exists in the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param tagName - Tag name to check.
+ * @returns True if tag exists.
+ *
+ * @example
+ * ```typescript
+ * if (await tagExists('/my-repo', 'v1.0.0')) { ... }
+ * ```
  */
 export async function tagExists(repoPath: string, tagName: string): Promise<boolean> {
   const tags = await listTags(repoPath);
@@ -65,7 +100,47 @@ export async function tagExists(repoPath: string, tagName: string): Promise<bool
 }
 
 /**
- * Deletes a tag locally.
+ * Retrieves detailed inspection for a specific tag.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param tagName - Name of the tag.
+ * @returns TagDetails object.
+ * @throws GitTagNotFoundError if tag does not exist.
+ *
+ * @example
+ * ```typescript
+ * const details = await getTagDetails('/my-repo', 'v1.0.0');
+ * ```
+ */
+export async function getTagDetails(repoPath: string, tagName: string): Promise<TagDetails> {
+  const validatedName = validateTagName(tagName);
+
+  if (!(await tagExists(repoPath, validatedName))) {
+    throw new GitTagNotFoundError(validatedName, { repoPath });
+  }
+
+  return withGitErrorHandling('getTagDetails', repoPath, async (client) => {
+    const commit = (await client.revparse([validatedName])).trim();
+    const showOutput = await client.show([validatedName, '--summary']);
+
+    return {
+      name: validatedName,
+      commit,
+      message: showOutput,
+    };
+  });
+}
+
+/**
+ * Deletes a tag locally from the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param tagName - Tag name to delete.
+ *
+ * @example
+ * ```typescript
+ * await deleteTag('/my-repo', 'v1.0.0');
+ * ```
  */
 export async function deleteTag(repoPath: string, tagName: string): Promise<void> {
   const validatedName = validateTagName(tagName);

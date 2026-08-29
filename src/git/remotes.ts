@@ -1,9 +1,19 @@
 import { withGitErrorHandling } from './client.js';
 import type { RemoteEntry } from './types.js';
 import { devInfo } from '../core/dev-mode/index.js';
+import { GitValidationError } from './errors.js';
 
 /**
- * Lists all configured remotes.
+ * Lists all configured remotes with their fetch and push URLs.
+ *
+ * @param repoPath - Repository root directory path.
+ * @returns Array of RemoteEntry objects.
+ *
+ * @example
+ * ```typescript
+ * const remotes = await getRemotes('/my-repo');
+ * console.log(remotes[0]?.name, remotes[0]?.refs.fetch);
+ * ```
  */
 export async function getRemotes(repoPath: string): Promise<RemoteEntry[]> {
   return withGitErrorHandling('getRemotes', repoPath, async (client) => {
@@ -19,17 +29,59 @@ export async function getRemotes(repoPath: string): Promise<RemoteEntry[]> {
 }
 
 /**
- * Adds a new remote.
+ * Adds a new remote to the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param name - Remote name (e.g. 'origin', 'upstream').
+ * @param url - Remote Git URL.
+ *
+ * @example
+ * ```typescript
+ * await addRemote('/my-repo', 'origin', 'https://github.com/user/repo.git');
+ * ```
  */
 export async function addRemote(repoPath: string, name: string, url: string): Promise<void> {
+  if (!name.trim()) throw new GitValidationError('Remote name cannot be empty.');
+  if (!url.trim()) throw new GitValidationError('Remote URL cannot be empty.');
+
   return withGitErrorHandling('addRemote', repoPath, async (client) => {
-    await client.addRemote(name, url);
+    await client.addRemote(name.trim(), url.trim());
     devInfo('GIT_REMOTE', `Added remote '${name}': ${url}`);
   });
 }
 
 /**
- * Removes an existing remote.
+ * Sets or updates the URL for an existing remote.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param name - Remote name.
+ * @param newUrl - The new remote URL.
+ *
+ * @example
+ * ```typescript
+ * await setRemoteUrl('/my-repo', 'origin', 'git@github.com:user/repo.git');
+ * ```
+ */
+export async function setRemoteUrl(repoPath: string, name: string, newUrl: string): Promise<void> {
+  if (!name.trim()) throw new GitValidationError('Remote name cannot be empty.');
+  if (!newUrl.trim()) throw new GitValidationError('Remote URL cannot be empty.');
+
+  return withGitErrorHandling('setRemoteUrl', repoPath, async (client) => {
+    await client.raw(['remote', 'set-url', name.trim(), newUrl.trim()]);
+    devInfo('GIT_REMOTE', `Updated remote URL for '${name}' -> ${newUrl}`);
+  });
+}
+
+/**
+ * Removes an existing remote from the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param name - Remote name to remove.
+ *
+ * @example
+ * ```typescript
+ * await removeRemote('/my-repo', 'upstream');
+ * ```
  */
 export async function removeRemote(repoPath: string, name: string): Promise<void> {
   return withGitErrorHandling('removeRemote', repoPath, async (client) => {
@@ -39,7 +91,15 @@ export async function removeRemote(repoPath: string, name: string): Promise<void
 }
 
 /**
- * Fetches from remote.
+ * Fetches updates from a remote repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Remote name and prune preferences.
+ *
+ * @example
+ * ```typescript
+ * await fetchRemote('/my-repo', { remote: 'origin', prune: true });
+ * ```
  */
 export async function fetchRemote(
   repoPath: string,
@@ -57,7 +117,15 @@ export async function fetchRemote(
 }
 
 /**
- * Pulls changes from remote.
+ * Pulls changes from a remote branch.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Remote name, branch name, and rebase preferences.
+ *
+ * @example
+ * ```typescript
+ * await pullFromRemote('/my-repo', { remote: 'origin', branch: 'main' });
+ * ```
  */
 export async function pullFromRemote(
   repoPath: string,
@@ -75,7 +143,15 @@ export async function pullFromRemote(
 }
 
 /**
- * Pushes changes to remote.
+ * Pushes local branch commits to a remote repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param options - Remote name, branch name, upstream flag, tags, and force push options.
+ *
+ * @example
+ * ```typescript
+ * await pushToRemote('/my-repo', { remote: 'origin', branch: 'main', setUpstream: true });
+ * ```
  */
 export async function pushToRemote(
   repoPath: string,

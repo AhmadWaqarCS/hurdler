@@ -1,11 +1,20 @@
 import { withGitErrorHandling } from './client.js';
-import type { BranchSummary, CreateBranchOptions, CheckoutBranchOptions } from './types.js';
+import type { BranchSummary, CreateBranchOptions, CheckoutBranchOptions, BranchDetails } from './types.js';
 import { GitRefNameSchema } from './schema.js';
-import { GitValidationError } from './errors.js';
+import { GitValidationError, GitBranchNotFoundError } from './errors.js';
 import { devInfo } from '../core/dev-mode/index.js';
 
 /**
- * Validates a branch or reference name according to Git naming conventions.
+ * Validates a branch or reference name according to standard Git naming conventions.
+ *
+ * @param name - The ref or branch name string to validate.
+ * @returns The validated ref name string.
+ * @throws GitValidationError if ref name is invalid.
+ *
+ * @example
+ * ```typescript
+ * const validName = validateRefName('feature/user-auth');
+ * ```
  */
 export function validateRefName(name: string): string {
   const parseResult = GitRefNameSchema.safeParse(name);
@@ -18,7 +27,16 @@ export function validateRefName(name: string): string {
 }
 
 /**
- * Lists all local and remote branches in the repository.
+ * Lists all local and tracking branches in the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @returns BranchSummary containing current active branch and map of branch details.
+ *
+ * @example
+ * ```typescript
+ * const branches = await listBranches('/my-repo');
+ * console.log(branches.current, branches.all);
+ * ```
  */
 export async function listBranches(repoPath: string): Promise<BranchSummary> {
   return withGitErrorHandling('listBranches', repoPath, async (client) => {
@@ -43,7 +61,15 @@ export async function listBranches(repoPath: string): Promise<BranchSummary> {
 }
 
 /**
- * Retrieves the name of the currently active branch.
+ * Retrieves the name of the currently active Git branch.
+ *
+ * @param repoPath - Repository root directory path.
+ * @returns Active branch name (e.g. 'main', 'feature/login').
+ *
+ * @example
+ * ```typescript
+ * const current = await getCurrentBranch('/my-repo');
+ * ```
  */
 export async function getCurrentBranch(repoPath: string): Promise<string> {
   return withGitErrorHandling('getCurrentBranch', repoPath, async (client) => {
@@ -53,7 +79,16 @@ export async function getCurrentBranch(repoPath: string): Promise<string> {
 }
 
 /**
- * Checks if a branch exists locally.
+ * Checks if a specific branch exists locally in the repository.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param branchName - Branch name to check.
+ * @returns True if branch exists.
+ *
+ * @example
+ * ```typescript
+ * if (await branchExists('/my-repo', 'feature/login')) { ... }
+ * ```
  */
 export async function branchExists(repoPath: string, branchName: string): Promise<boolean> {
   const summary = await listBranches(repoPath);
@@ -61,7 +96,46 @@ export async function branchExists(repoPath: string, branchName: string): Promis
 }
 
 /**
+ * Retrieves detailed information about a specific branch.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param branchName - Name of the branch.
+ * @returns BranchDetails object.
+ * @throws GitBranchNotFoundError if branch does not exist.
+ *
+ * @example
+ * ```typescript
+ * const details = await getBranchDetails('/my-repo', 'main');
+ * ```
+ */
+export async function getBranchDetails(repoPath: string, branchName: string): Promise<BranchDetails> {
+  const validatedName = validateRefName(branchName);
+  const summary = await listBranches(repoPath);
+
+  if (!summary.all.includes(validatedName)) {
+    throw new GitBranchNotFoundError(validatedName, { repoPath });
+  }
+
+  const info = summary.branches[validatedName];
+  return {
+    name: validatedName,
+    current: summary.current === validatedName,
+    commit: info?.commit ?? '',
+    label: info?.label ?? validatedName,
+  };
+}
+
+/**
  * Creates a new branch off a specified starting point or HEAD.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param branchName - Name of the new branch.
+ * @param options - Starting point and checkout preferences.
+ *
+ * @example
+ * ```typescript
+ * await createBranch('/my-repo', 'feature/ui-nav', { checkout: true });
+ * ```
  */
 export async function createBranch(
   repoPath: string,
@@ -91,6 +165,15 @@ export async function createBranch(
 
 /**
  * Checks out an existing branch or creates and checks out a new branch.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param branchName - Branch name to switch to.
+ * @param options - Create new flag or force discard.
+ *
+ * @example
+ * ```typescript
+ * await checkoutBranch('/my-repo', 'main');
+ * ```
  */
 export async function checkoutBranch(
   repoPath: string,
@@ -117,6 +200,15 @@ export async function checkoutBranch(
 
 /**
  * Deletes a branch locally.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param branchName - Branch name to delete.
+ * @param options - Force delete flag.
+ *
+ * @example
+ * ```typescript
+ * await deleteBranch('/my-repo', 'feature/old-experiment', { force: true });
+ * ```
  */
 export async function deleteBranch(
   repoPath: string,
@@ -133,6 +225,15 @@ export async function deleteBranch(
 
 /**
  * Renames an existing branch.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param oldName - Old branch name.
+ * @param newName - New branch name.
+ *
+ * @example
+ * ```typescript
+ * await renameBranch('/my-repo', 'feature/temp', 'feature/final');
+ * ```
  */
 export async function renameBranch(
   repoPath: string,
@@ -145,5 +246,30 @@ export async function renameBranch(
   return withGitErrorHandling('renameBranch', repoPath, async (client) => {
     await client.branch(['-m', validatedOld, validatedNew]);
     devInfo('GIT_BRANCH', `Renamed branch '${validatedOld}' to '${validatedNew}'`);
+  });
+}
+
+/**
+ * Sets the tracking upstream reference for a local branch.
+ *
+ * @param repoPath - Repository root directory path.
+ * @param branchName - Local branch name.
+ * @param upstreamRef - Upstream tracking reference (e.g. 'origin/main').
+ *
+ * @example
+ * ```typescript
+ * await setUpstreamBranch('/my-repo', 'main', 'origin/main');
+ * ```
+ */
+export async function setUpstreamBranch(
+  repoPath: string,
+  branchName: string,
+  upstreamRef: string
+): Promise<void> {
+  const validatedBranch = validateRefName(branchName);
+
+  return withGitErrorHandling('setUpstreamBranch', repoPath, async (client) => {
+    await client.branch(['--set-upstream-to', upstreamRef, validatedBranch]);
+    devInfo('GIT_BRANCH', `Set upstream for '${validatedBranch}' -> '${upstreamRef}'`);
   });
 }

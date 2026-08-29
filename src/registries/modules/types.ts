@@ -1,7 +1,13 @@
 /**
  * Modules Registry Subsystem - Type Definitions
+ *
+ * Defines the core data structures, filter options, update payloads, and configuration
+ * options for the Hurdler Node.js modules and preset stack bundles registry.
  */
 
+/**
+ * Functional category classification for Node.js modules.
+ */
 export type ModuleCategory =
   | 'validation'
   | 'orm_database'
@@ -18,6 +24,9 @@ export type ModuleCategory =
   | 'ai_llm'
   | (string & {});
 
+/**
+ * Supported runtime environment target.
+ */
 export type RuntimeEnvironment =
   | 'node'
   | 'edge'
@@ -25,12 +34,24 @@ export type RuntimeEnvironment =
   | 'universal'
   | (string & {});
 
+/**
+ * Package distribution format.
+ */
 export type PackageType = 'esm' | 'cjs' | 'dual';
 
+/**
+ * Semver version strategy for dependencies resolution.
+ */
 export type VersionStrategy = 'exact' | 'caret' | 'tilde' | 'latest_stable';
 
+/**
+ * Target package manager for CLI install commands.
+ */
 export type PackageManager = 'npm' | 'pnpm' | 'yarn' | 'bun';
 
+/**
+ * Predefined package manager installation command templates.
+ */
 export interface InstallCommands {
   npm?: string;
   pnpm?: string;
@@ -38,6 +59,9 @@ export interface InstallCommands {
   bun?: string;
 }
 
+/**
+ * Complete metadata and configuration specification for a registered module.
+ */
 export interface ModuleDefinition {
   /** Canonical npm package name identifier (e.g. 'zod', 'prisma', '@prisma/client', 'next') */
   name: string;
@@ -83,11 +107,43 @@ export interface ModuleDefinition {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Partial update payload for modifying an existing module.
+ */
+export interface ModuleUpdate {
+  displayName?: string;
+  category?: ModuleCategory;
+  description?: string;
+  docUrl?: string;
+  repoUrl?: string;
+  npmUrl?: string;
+  recommendedVersion?: string;
+  pinnedVersion?: string;
+  minNodeVersion?: string;
+  isDevDependency?: boolean;
+  installCommands?: InstallCommands;
+  runtime?: RuntimeEnvironment[];
+  packageType?: PackageType;
+  tags?: string[];
+  peerDependencies?: string[];
+  recommendedCompanions?: string[];
+  bestPractices?: string[];
+  antiPatterns?: string[];
+  exampleUsage?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Result structure for generated package.json dependencies.
+ */
 export interface PackageJsonDependenciesResult {
   dependencies: Record<string, string>;
   devDependencies: Record<string, string>;
 }
 
+/**
+ * Predefined stack preset bundle containing grouped modules for specific application architectures.
+ */
 export interface ModuleBundle {
   /** Unique bundle identifier (e.g. 'nextjs_fullstack', 'database_prisma') */
   id: string;
@@ -105,6 +161,21 @@ export interface ModuleBundle {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Partial update payload for modifying an existing module bundle.
+ */
+export interface BundleUpdate {
+  name?: string;
+  description?: string;
+  modules?: string[];
+  devModules?: string[];
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Filtering options for querying modules.
+ */
 export interface ModuleFilterOptions {
   /** Whitelist of specific module names */
   names?: string[];
@@ -120,6 +191,23 @@ export interface ModuleFilterOptions {
   search?: string;
 }
 
+/**
+ * Filtering options for querying module preset bundles.
+ */
+export interface BundleFilterOptions {
+  /** Whitelist of specific bundle IDs */
+  ids?: string[];
+  /** Filter by tags (must match at least one) */
+  tags?: string[];
+  /** Filter by module name included in the bundle */
+  includesModule?: string;
+  /** Search query matching against id, name, description, or tags */
+  search?: string;
+}
+
+/**
+ * Options for generating package.json dependencies.
+ */
 export interface PackageDependenciesOptions {
   /** Version strategy to apply ('exact' | 'caret' | 'tilde' | 'latest_stable', default: 'caret') */
   strategy?: VersionStrategy;
@@ -129,6 +217,9 @@ export interface PackageDependenciesOptions {
   includeCompanions?: boolean;
 }
 
+/**
+ * Options for generating LLM prompt context markdown.
+ */
 export interface ModulePromptOptions {
   /** Include code examples in prompt output (default: true) */
   includeExamples?: boolean;
@@ -146,11 +237,20 @@ export interface ModulePromptOptions {
   detailLevel?: 'compact' | 'detailed' | 'full';
 }
 
+/**
+ * Key-value mapping of module name to ModuleDefinition.
+ */
 export type ModuleRegistryMap = Record<string, ModuleDefinition>;
+
+/**
+ * Key-value mapping of bundle id to ModuleBundle.
+ */
 export type ModuleBundleMap = Record<string, ModuleBundle>;
 
+/**
+ * Structure of the persisted JSON file (.hurdler/registries/modules.json).
+ */
 export interface PersistedModuleRegistry {
   modules: ModuleRegistryMap;
   bundles: ModuleBundleMap;
 }
-
