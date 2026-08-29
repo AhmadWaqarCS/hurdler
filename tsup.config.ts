@@ -1,0 +1,32 @@
+import { defineConfig } from 'tsup';
+
+export default defineConfig({
+  entry: ['src/index.ts'],
+  format: ['esm', 'cjs'],
+  dts: false,
+  splitting: false,
+  sourcemap: true,
+  clean: false,
+  target: 'es2022',
+  external: [
+    'eslint',
+    '@eslint/js',
+    'typescript-eslint',
+    '@typescript-eslint/parser',
+    '@typescript-eslint/eslint-plugin',
+    'prettier',
+    'ts-morph',
+    'tree-sitter',
+    'tree-sitter-typescript',
+    'tree-sitter-javascript',
+    'tree-sitter-json',
+    'typescript',
+    'simple-git',
+    'zod',
+    'ai',
+    '@ai-sdk/anthropic',
+    '@ai-sdk/google',
+    '@ai-sdk/google-vertex',
+    'dotenv',
+  ],
+});

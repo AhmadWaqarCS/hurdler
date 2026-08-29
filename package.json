@@ -24,14 +24,14 @@
     }
   },
   "scripts": {
-    "build": "tsup src/index.ts --format esm,cjs && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build": "tsup && tsc --emitDeclarationOnly --declaration --outDir dist",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^26.4.0",
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
-    "typescript": "^7.0.2"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.45",
